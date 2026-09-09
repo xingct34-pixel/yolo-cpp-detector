@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/xct/cpp_projects/yolo_v2/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
