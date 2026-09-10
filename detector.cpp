@@ -22,25 +22,26 @@ vector<float> Detector::preprocess(Mat& img, int& img_w, int& img_h) {
     img_w = img.cols;
     img_h = img.rows;
     
-    Mat blob;
-    resize(img, blob, Size(640, 640));
-    blob.convertTo(blob, CV_32F, 1.0 / 255.0);
-    cvtColor(blob, blob, COLOR_BGR2RGB);
+    Mat blob;                            // blob：存放预处理中间结果的图像矩阵
+    resize(img, blob, Size(640, 640));    //拉伸缩放原图，模型固定输入尺寸是640*640
+    blob.convertTo(blob, CV_32F, 1.0 / 255.0);     //归一化，像素值转化为32位浮点数，取值范围由0-255转化为0-1
+    cvtColor(blob, blob, COLOR_BGR2RGB);             //通道用BGR转化为RGB
     
     Mat channels[3];
     split(blob, channels);
     vector<float> input_data;
     for (int c = 0; c < 3; c++) {
         input_data.insert(input_data.end(),
-            (float*)channels[c].data,
-            (float*)channels[c].data + 640 * 640);
+            (float*)channels[c].data,             //起始指针
+            (float*)channels[c].data + 640 * 640);  //结尾指针   后移640*640的位置
     }
     return input_data;
 }
 
-void Detector::postprocess(Mat& img, float* data, int img_w, int img_h) {
-    float conf_threshold = 0.5;
-    vector<Rect> boxes;
+//后处理
+void Detector::postprocess(Mat& img, float* data, int img_w, int img_h) {  
+    float conf_threshold = 0.5;           //置信阈值，大于0.5被保存
+    vector<Rect> boxes;                   //保存筛选出来的框
     vector<float> scores;
     vector<int> class_ids;
 
@@ -48,18 +49,18 @@ void Detector::postprocess(Mat& img, float* data, int img_w, int img_h) {
         float max_score = 0;
         int class_id = 0;
         for (int c = 0; c < 80; c++) {
-            float score = data[c * 8400 + 4 * 8400 + i];
+            float score = data[c * 8400 + 4 * 8400 + i];  //前四行是xywh，后面c（80）是coco数据集类别，i是在这一行里面取第 i 个预测框的置信度值
             if (score > max_score) {
                 max_score = score;
-                class_id = c;
+                class_id = c;                 //更新最大置信值和他对应的id
             }
         }
-        if (max_score > conf_threshold) {
+        if (max_score > conf_threshold) {               //判断是否大于阈值
             float cx = data[0 * 8400 + i] * img_w / 640;
             float cy = data[1 * 8400 + i] * img_h / 640;
             float w  = data[2 * 8400 + i] * img_w / 640;
             float h  = data[3 * 8400 + i] * img_h / 640;
-            int x = (int)(cx - w / 2);
+            int x = (int)(cx - w / 2);                                   //x轴往右变大，y轴往下变大，各减一半xy为图片左上角
             int y = (int)(cy - h / 2);
             boxes.push_back(Rect(x, y, (int)w, (int)h));
             scores.push_back(max_score);
@@ -68,12 +69,12 @@ void Detector::postprocess(Mat& img, float* data, int img_w, int img_h) {
     }
 
     vector<int> indices;
-    dnn::NMSBoxes(boxes, scores, conf_threshold, 0.45, indices);
-
-    for (int idx : indices) {
-        rectangle(img, boxes[idx], Scalar(0, 255, 0), 2);
+    dnn::NMSBoxes(boxes, scores, conf_threshold, 0.45, indices);       // 执行非极大值抑制(NMS)，过滤重叠的重复检测框，IOU 阈>0.45就会失效
+    
+    for (int idx : indices) {  
+        rectangle(img, boxes[idx], Scalar(0, 255, 0), 2);  //OpenCV绘图函数，在图像上画矩形
         string label = class_names_[class_ids[idx]] + 
-                       " " + to_string((int)(scores[idx] * 100)) + "%";
+                       " " + to_string((int)(scores[idx] * 100)) + "%";          //转化为百分比
         putText(img, label, Point(boxes[idx].x, boxes[idx].y - 5),
                 FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0), 1);
     }
