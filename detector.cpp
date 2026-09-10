@@ -28,7 +28,8 @@ vector<float> Detector::preprocess(Mat& img, int& img_w, int& img_h) {
     cvtColor(blob, blob, COLOR_BGR2RGB);             //通道用BGR转化为RGB
     
     Mat channels[3];
-    split(blob, channels);
+    split(blob, channels);  //HWC转CHW（split+循环插入），把三个通道分开，按R全部→G全部→B全部排列，ONNX要求的内存格式
+
     vector<float> input_data;
     for (int c = 0; c < 3; c++) {
         input_data.insert(input_data.end(),
