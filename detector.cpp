@@ -196,28 +196,65 @@ void Detector::postprocess(Mat& img, float* data, int img_w, int img_h) {
                 FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0), 1);
     }
 }
-/*
-第一步：调用preprocess
-└── 把图片预处理成input_data
 
-第二步：创建输入Tensor
-└── 告诉ONNX数据形状[1,3,640,640]
-└── 把input_data包装成Tensor
+// 推理主流程：预处理 → 创建Tensor → 推理 → 计算FPS → 取输出 → 后处理
+cv::Mat Detector::detect(cv::Mat& img) {
 
-第三步：计时开始
-└── 记录推理前时间
+    // 第一步：调用preprocess，把原始图像转换成模型输入需要的一维浮点数组
+    int img_w, img_h;
+    vector<float> input_data = preprocess(img, img_w, img_h);
 
-第四步：session.Run()推理
-└── 把Tensor送进模型
-└── 得到输出outputs
+    // 第二步：创建输入Tensor
+    // MemoryInfo：告诉ONNX Runtime数据存放在CPU内存里（区别于GPU显存）
+    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(
+        OrtArenaAllocator, OrtMemTypeDefault);
 
-第五步：计时结束
-└── 计算FPS
+    // 输入形状：batch=1（一次一张图）, channel=3（RGB三通道）, height=640, width=640
+    vector<int64_t> input_shape = {1, 3, 640, 640};
 
-第六步：取出输出数据
-└── GetTensorMutableData
+    // 把input_data这块内存包装成ONNX Runtime认识的Tensor
+    // 传入内存信息、数据指针、数据长度、形状指针、形状维度数
+    // Tensor不会重新拷贝数据，而是直接指向input_data底层内存
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
+        memory_info,
+        input_data.data(),
+        input_data.size(),
+        input_shape.data(),
+        input_shape.size()
+    );
 
-第七步：调用postprocess
-└── 解析结果+NMS+画框
+    // 第三步：准备输入输出节点名字
+    // 这两个名字是模型导出ONNX时确定的，需要和模型实际的输入输出节点名一致
+    const char* input_names[] = {"images"};
+    const char* output_names[] = {"output0"};
 
-第八步：返回画好框的图片*/
+    // 第四步：计时开始，记录推理前的时间点
+    auto start = chrono::high_resolution_clock::now();
+
+    // 第五步：session.Run()推理
+    // 把输入Tensor送进模型，指定输入输出节点名字及个数，得到输出结果outputs
+    auto output_tensors = session_.Run(
+        Ort::RunOptions{nullptr},
+        input_names,
+        &input_tensor,
+        1,              // 输入Tensor个数
+        output_names,
+        1               // 输出Tensor个数
+    );
+
+    // 第六步：计时结束，计算FPS
+    auto end = chrono::high_resolution_clock::now();
+    double elapsed = chrono::duration<double>(end - start).count();  // 单位：秒
+    double fps = 1.0 / elapsed;
+    cout << "推理耗时：" << elapsed * 1000 << " ms, FPS: " << fps << endl;
+
+    // 第七步：取出输出数据
+    // GetTensorMutableData：拿到输出Tensor底层的float指针，方便postprocess用下标直接访问
+    float* output_data = output_tensors[0].GetTensorMutableData<float>();
+
+    // 第八步：调用postprocess，解析结果+NMS+画框
+    postprocess(img, output_data, img_w, img_h);
+
+    // 返回画好检测框的图片
+    return img;
+}
