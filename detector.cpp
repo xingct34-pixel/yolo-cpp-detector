@@ -258,3 +258,29 @@ cv::Mat Detector::detect(cv::Mat& img) {
     // 返回画好检测框的图片
     return img;
 }
+
+
+第一步：调用preprocess
+└── 把图片预处理成input_data
+
+第二步：创建输入Tensor
+└── 告诉ONNX数据形状[1,3,640,640]
+└── 把input_data包装成Tensor
+
+第三步：计时开始
+└── 记录推理前时间
+
+第四步：session.Run()推理
+└── 把Tensor送进模型
+└── 得到输出outputs
+
+第五步：计时结束
+└── 计算FPS
+
+第六步：取出输出数据
+└── GetTensorMutableData
+
+第七步：调用postprocess
+└── 解析结果+NMS+画框
+
+第八步：返回画好框的图片*/
