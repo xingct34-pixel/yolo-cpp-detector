@@ -8,7 +8,7 @@ Detector::Detector(const string& model_path, const string& classes_path)
     : env_(ORT_LOGGING_LEVEL_WARNING, "yolo"),
       session_(env_, model_path.c_str(), session_options_) {
     
-    // 读取类别名称
+
     // ifstream：input-file-stream，文件输入流，专门用于从磁盘文件读取数据
     ifstream f(classes_path);
     string line;                  // 用于临时存储从类别文件中读取的每一行文字
@@ -18,11 +18,10 @@ Detector::Detector(const string& model_path, const string& classes_path)
         class_names_.push_back(line);
     }
 
-    // 输出实际加载的类别数量
+    // 输出类别数量
     cout << "加载类别数量：" << class_names_.size() << endl;
 
     // 构造Detector对象时创建ONNX Runtime推理会话，
-    // 如果能够执行到这里，说明模型已经成功加载
     cout << "模型加载成功" << endl;
 }
 
@@ -36,23 +35,19 @@ vector<float> Detector::preprocess(Mat& img, int& img_w, int& img_h) {
     Mat blob;                            // blob：存放预处理中间结果的图像矩阵
 
     // 将原始图像缩放到模型要求的固定输入尺寸640×640
-    // 原始图像尺寸可能不同，因此这里先统一输入尺寸
     resize(img, blob, Size(640, 640));
 
     // 将图像数据转换成32位浮点数，并进行归一化
     // 原始像素值范围为0~255，这里乘以1/255后变成0~1
-    // 神经网络通常使用这种浮点数形式作为输入
     blob.convertTo(blob, CV_32F, 1.0 / 255.0);
 
     // 将OpenCV默认的BGR通道顺序转换为RGB
-    // OpenCV读取图像默认使用BGR，而模型通常按照RGB顺序进行训练
     cvtColor(blob, blob, COLOR_BGR2RGB);
 
     // 创建3个单通道矩阵，分别保存R、G、B三个通道
     Mat channels[3];
 
-    // 将RGB图像拆分成三个独立的单通道矩阵
-    // 原始图像的数据排列可以理解为HWC：
+    // 原始图像的数据排列可以理解为HWC（ Height, Width, Channel）：HWC，opencv常用格式，CHW是Pytorch常用格式，加个N事批量处理数据（batch size）
     // 像素1的R、G、B → 像素2的R、G、B → ...
     split(blob, channels);
 
