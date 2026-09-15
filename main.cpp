@@ -6,15 +6,20 @@
 using namespace std;
 using namespace cv;
 
+// 用来在"显示线程"和"保存线程"之间传递数据：图片本身 + 要保存的文件名
+struct SaveTask {
+    Mat image;
+    string filename;
+};
+
 // 读帧线程：只负责从视频里读帧，push进frame_queue
 void read_frames(VideoCapture& cap, ThreadSafeQueue<Mat>& frame_queue) {
     Mat frame;
     while (true) {
         cap >> frame;
-        if (frame.empty()) break;   // 视频读完了，退出循环
+        if (frame.empty()) break;
         frame_queue.push(frame);
     }
-    // 读完之后，push一个空Mat作为"结束信号"，通知推理线程没有更多帧了
     frame_queue.push(Mat());
 }
 
@@ -22,25 +27,38 @@ void read_frames(VideoCapture& cap, ThreadSafeQueue<Mat>& frame_queue) {
 void infer_frames(Detector& detector, ThreadSafeQueue<Mat>& frame_queue, ThreadSafeQueue<Mat>& result_queue) {
     while (true) {
         Mat frame = frame_queue.pop();
-        if (frame.empty()) break;   // 收到结束信号，退出循环
+        if (frame.empty()) break;
         Mat result = detector.detect(frame);
         result_queue.push(result);
     }
-    // 同样push一个空Mat，通知显示线程没有更多结果了
     result_queue.push(Mat());
 }
 
-// 显示线程：从result_queue里pop，保存/显示
-void show_results(ThreadSafeQueue<Mat>& result_queue) {
+// 显示线程：从result_queue里pop，每10帧生成一个保存任务，push进save_queue（不直接写文件，不卡住自己）
+void show_results(ThreadSafeQueue<Mat>& result_queue, ThreadSafeQueue<SaveTask>& save_queue) {
     int count = 0;
     while (true) {
         Mat result = result_queue.pop();
-        if (result.empty()) break;  // 收到结束信号，退出循环
+        if (result.empty()) break;
         count++;
         if (count % 10 == 0) {
-            imwrite("frame_" + to_string(count) + ".jpg", result);
+            SaveTask task;
+            task.image = result;
+            task.filename = "frame_" + to_string(count) + ".jpg";
+            save_queue.push(task);   // 只是丢进队列，不等真正写完
             cout << "第" << count << "帧处理完成" << endl;
         }
+    }
+    // 通知保存线程：没有更多要保存的了
+    save_queue.push(SaveTask{Mat(), ""});
+}
+
+// 保存线程：专门负责把图片写入磁盘，慢是它自己的事，不影响别的线程
+void save_results(ThreadSafeQueue<SaveTask>& save_queue) {
+    while (true) {
+        SaveTask task = save_queue.pop();
+        if (task.image.empty()) break;   // 收到结束信号
+        imwrite(task.filename, task.image);
     }
 }
 
@@ -56,24 +74,22 @@ int main() {
         return -1;
     }
 
-    // 创建两个队列，容量都设为5（经验值，后续可调）
     ThreadSafeQueue<Mat> frame_queue(5);
     ThreadSafeQueue<Mat> result_queue(5);
+    ThreadSafeQueue<SaveTask> save_queue(5);   // 新增：保存任务队列
 
-    // 记录整个Pipeline开始的时间点
     auto start = chrono::high_resolution_clock::now();
 
-    // 创建三个线程，分别执行读帧、推理、显示
     thread t1(read_frames, std::ref(cap), std::ref(frame_queue));
     thread t2(infer_frames, std::ref(detector), std::ref(frame_queue), std::ref(result_queue));
-    thread t3(show_results, std::ref(result_queue));
+    thread t3(show_results, std::ref(result_queue), std::ref(save_queue));
+    thread t4(save_results, std::ref(save_queue));   // 新增：保存线程
 
-    // 等待三个线程都执行完毕，主线程才能退出
     t1.join();
     t2.join();
     t3.join();
+    t4.join();   // 新增：也要等保存线程跑完
 
-    // 记录结束时间点，计算总耗时
     auto end = chrono::high_resolution_clock::now();
     double total_time = chrono::duration<double>(end - start).count();
     cout << "总处理时间：" << total_time << " 秒" << endl;
