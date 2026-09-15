@@ -1,5 +1,6 @@
 #include <iostream>
 #include <thread>
+#include <chrono>
 #include "detector.h"
 #include "thread_safe_queue.h"
 using namespace std;
@@ -59,6 +60,9 @@ int main() {
     ThreadSafeQueue<Mat> frame_queue(5);
     ThreadSafeQueue<Mat> result_queue(5);
 
+    // 记录整个Pipeline开始的时间点
+    auto start = chrono::high_resolution_clock::now();
+
     // 创建三个线程，分别执行读帧、推理、显示
     thread t1(read_frames, std::ref(cap), std::ref(frame_queue));
     thread t2(infer_frames, std::ref(detector), std::ref(frame_queue), std::ref(result_queue));
@@ -68,6 +72,11 @@ int main() {
     t1.join();
     t2.join();
     t3.join();
+
+    // 记录结束时间点，计算总耗时
+    auto end = chrono::high_resolution_clock::now();
+    double total_time = chrono::duration<double>(end - start).count();
+    cout << "总处理时间：" << total_time << " 秒" << endl;
 
     cap.release();
     cout << "处理完成" << endl;
