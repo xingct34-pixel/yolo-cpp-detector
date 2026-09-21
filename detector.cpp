@@ -4,6 +4,15 @@
 using namespace std;
 using namespace cv;
 
+// 新增：创建一份限制线程数的SessionOptions
+Ort::SessionOptions Detector::make_session_options() {
+    Ort::SessionOptions options;
+    options.SetIntraOpNumThreads(1);   // 限制ONNX Runtime内部只用1个线程做单次推理
+    return options;
+}
+
+
+
 Detector::Detector(const string& model_path, const string& classes_path)
     : env_(ORT_LOGGING_LEVEL_WARNING, "yolo"),
       session_(env_, model_path.c_str(), session_options_) {
