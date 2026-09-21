@@ -15,4 +15,4 @@ private:
     std::vector<std::string> class_names_;
     std::vector<float> preprocess(cv::Mat& img, int& img_w, int& img_h);    //预处理，输入原图，输出归一化、转通道、resize后的模型输入浮点数组
     void postprocess(cv::Mat& img, float* data, int img_w, int img_h);};      // 后处理函数
-    static Ort::SessionOptions make_session_options();   // 新增这一行
+         static Ort::SessionOptions make_session_options();   // 新增这一行
