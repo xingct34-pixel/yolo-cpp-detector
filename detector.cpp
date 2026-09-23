@@ -10,7 +10,7 @@ Ort::SessionOptions Detector::make_session_options() {
     options.SetIntraOpNumThreads(1);
 
     // 新增：启用CUDA，让推理跑在GPU上而不是CPU
-    OrtCUDAProviderOptions cuda_options;
+    OrtCUDAProviderOptions cuda_options{};
     cuda_options.device_id = 0;   // 使用第0号GPU
     options.AppendExecutionProvider_CUDA(cuda_options);
 
