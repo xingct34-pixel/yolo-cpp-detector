@@ -15,7 +15,7 @@ Ort::SessionOptions Detector::make_session_options() {
 
 Detector::Detector(const string& model_path, const string& classes_path)
     : env_(ORT_LOGGING_LEVEL_WARNING, "yolo"),
-      session_(env_, model_path.c_str(), session_options_) {
+      session_(env_, model_path.c_str(), make_session_options()) {
     
 
     // ifstream：input-file-stream，文件输入流，专门用于从磁盘文件读取数据
