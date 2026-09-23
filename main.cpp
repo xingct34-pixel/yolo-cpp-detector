@@ -64,11 +64,11 @@ void save_results(ThreadSafeQueue<SaveTask>& save_queue) {
 
 int main() {
     Detector detector(
-        "/home/xct/cpp_projects/yolo11n.onnx",
-        "/home/xct/cpp_projects/coco.txt"
+        "/home/xct/yolo-cpp-detector/yolo11n.onnx"
+        "/home/xct/yolo-cpp-detector/coco.txt"
     );
 
-    VideoCapture cap("/home/xct/cpp_projects/test.mp4");
+    VideoCapture cap("/home/xct/yolo-cpp-detector/test.mp4");
     if (!cap.isOpened()) {
         cout << "视频打开失败" << endl;
         return -1;
