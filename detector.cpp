@@ -7,11 +7,15 @@ using namespace cv;
 // 新增：创建一份限制线程数的SessionOptions
 Ort::SessionOptions Detector::make_session_options() {
     Ort::SessionOptions options;
-    options.SetIntraOpNumThreads(1);   // 限制ONNX Runtime内部只用1个线程做单次推理
+    options.SetIntraOpNumThreads(1);
+
+    // 新增：启用CUDA，让推理跑在GPU上而不是CPU
+    OrtCUDAProviderOptions cuda_options;
+    cuda_options.device_id = 0;   // 使用第0号GPU
+    options.AppendExecutionProvider_CUDA(cuda_options);
+
     return options;
 }
-
-
 
 Detector::Detector(const string& model_path, const string& classes_path)
     : env_(ORT_LOGGING_LEVEL_WARNING, "yolo"),
