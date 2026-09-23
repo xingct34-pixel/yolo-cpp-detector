@@ -64,7 +64,7 @@ void save_results(ThreadSafeQueue<SaveTask>& save_queue) {
 
 int main() {
     Detector detector(
-        "/home/xct/yolo-cpp-detector/yolo11n.onnx"，
+        "/home/xct/yolo-cpp-detector/yolo11n.onnx",
         "/home/xct/yolo-cpp-detector/coco.txt"
     );
 
