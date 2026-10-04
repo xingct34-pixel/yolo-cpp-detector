@@ -1,0 +1,15 @@
+# CMake build files
+build/
+
+# Model files
+*.onnx
+*.pt
+
+# Video files
+*.mp4
+
+# Compressed files
+*.tgz
+
+# Compiled executable
+yolo_gpu

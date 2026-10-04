@@ -5,9 +5,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
-include_directories(/home/xct/onnxruntime-linux-x64-1.20.1/include)
+include_directories(/home/xct/onnxruntime-linux-x64-gpu-1.18.0/include)
 
-link_directories(/home/xct/onnxruntime-linux-x64-1.20.1/lib)
+link_directories(/home/xct/onnxruntime-linux-x64-gpu-1.18.0/lib)
 
 add_executable(yolo_v2 main.cpp detector.cpp)
 target_link_libraries(yolo_v2
