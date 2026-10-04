@@ -1,7 +1,7 @@
 #include "pipeline.h"
 
 #include <iostream>
-
+#include <chrono>
 using namespace std;
 using namespace cv;
 
@@ -35,7 +35,7 @@ void Pipeline::readLoop()
 
         data.frame_id = frame_id++;
         data.frame = frame.clone();
-
+        read_count_++;
         frame_queue_.push(std::move(data));
     }
 
@@ -54,7 +54,7 @@ void Pipeline::inferenceLoop()
         }
 
         Mat result = detector_.detect(data.frame);
-
+        inference_count_++;
         ResultData result_data;
 
         result_data.frame_id = data.frame_id;
@@ -66,7 +66,7 @@ void Pipeline::inferenceLoop()
     result_queue_.close();
 }
 
-void Pipeline::displayLoop()
+void Pipeline::display()
 {
     int last_displayed_id = -1;
 
@@ -85,7 +85,7 @@ void Pipeline::displayLoop()
         }
 
         imshow("YOLO Result", result.frame);
-
+        display_count_++;
         last_displayed_id = result.frame_id;
 
         if (waitKey(1) == 27)
@@ -94,14 +94,30 @@ void Pipeline::displayLoop()
         }
     }
 }
-
 void Pipeline::run()
 {
+    auto start = chrono::steady_clock::now();
+
     thread read_thread(&Pipeline::readLoop, this);
     thread inference_thread(&Pipeline::inferenceLoop, this);
-    thread display_thread(&Pipeline::displayLoop, this);
+
+    display();
 
     read_thread.join();
     inference_thread.join();
-    display_thread.join();
+
+    auto end = chrono::steady_clock::now();
+
+    double elapsed =
+        chrono::duration<double>(end - start).count();
+        cout << "读取帧数：" << read_count_ << endl;
+        cout << "推理帧数：" << inference_count_ << endl;
+        cout << "显示帧数：" << display_count_ << endl;
+        cout << "Pipeline 总耗时：" << elapsed << " 秒" << endl;
+
+        if (elapsed > 0)
+         {
+           cout << "实际推理 FPS："
+          << inference_count_ / elapsed << endl;
+         }
 }

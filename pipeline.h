@@ -31,9 +31,12 @@ private:
     // 三个线程分别负责三个阶段
     void readLoop();
     void inferenceLoop();
-    void displayLoop();
+    void display();
 
 private:
+    long long read_count_ = 0;
+    long long inference_count_ = 0;
+    long long display_count_ = 0;
     // 帧队列：读线程 → 推理线程
     ThreadSafeQueue<FrameData> frame_queue_;
 
