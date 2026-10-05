@@ -47,39 +47,60 @@ public:
     // const std::string& 拆开理解:
     //   const        表示函数内部不会修改它
     //   &            表示"引用",传的是原对象本身而不是复制一份,避免拷贝字符串的开销
-    Pipeline(const std::string& video_path,
+    Pipeline(const std::string& video_path,            //1、构造函数
              const std::string& model_path,
              const std::string& classes_path);
 
-    void run();         // void 表示没有返回值
+    void run();         // void 表示没有返回值         //2.公开函数
 
 private:
 
 
-    void readLoop();         // 读线程:循环读取视频的每一帧,打包成 FrameData 放进 frame_queue_
+    void readLoop();         // 读线程:循环读取视频的每一帧,打包成 FrameData 放进 frame_queue_     3、三个私有函数
 
 
-    void inferenceLoop();       // 推理线程:循环从 frame_queue_ 取帧,交给 detector_ 检测,结果放进 result_queue_
+    void inferenceLoop();       // 推理线程:循环从 frame_queue_ 取帧,交给 detector_ 检测,结果放进 result_queue_    4
 
-    void display();          // 显示线程:循环从 result_queue_ 取结果并显示出来           为什么显示不是循环？
+    void display();          // 显示线程:循环从 result_queue_ 取结果并显示出来           为什么显示不是循环？        5
 
 private:
 
-    long long read_count_ = 0;        // long long:比 int 范围更大的整数类型,计数很大时不会溢出
+    long long read_count_ = 0;        // long long:比 int 范围更大的整数类型,计数很大时不会溢出       6、整数计数帧
 
-    long long inference_count_ = 0;      // inference_count_:已经完成推理的帧数
-
-    long long display_count_ = 0;        // display_count_:已经显示的帧数
+    long long inference_count_ = 0;      // inference_count_:已经完成推理的帧数                     7
+ 
+    long long display_count_ = 0;        // display_count_:已经显示的帧数                           8
 
     // 作用:读线程往里放,推理线程从里取,中间用队列解耦,两个线程互不等待对方
-    ThreadSafeQueue<FrameData> frame_queue_;
+    ThreadSafeQueue<FrameData> frame_queue_;                                                     9、队列
 
     // 结果队列:推理线程放入,显示线程取出,里面装的是 ResultData
-    ThreadSafeQueue<ResultData> result_queue_;
+    ThreadSafeQueue<ResultData> result_queue_;                                                   10、队列
 
 
-    Detector detector_;
+    Detector detector_;                                                                         //对象11
 
     // 输入视频路径,保存下来供 readLoop() 打开视频时使用
-    std::string video_path_;
+    std::string video_path_;                                                               //字符串类型，12
 };
+
+
+
+
+/*
+    1. 构造函数（1 个）
+
+Pipeline(...)
+
+2. 成员函数（4 个）
+
+run()：公开，外部调用的入口
+readLoop()、inferenceLoop()、display()：私有，三个线程各自执行的函数
+
+3. 成员变量（7 个）
+
+三个计数器：read_count_、inference_count_、display_count_
+两个队列：frame_queue_、result_queue_
+一个检测器：detector_
+一个路径：video_path_
+*/
