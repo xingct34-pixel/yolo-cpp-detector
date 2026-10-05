@@ -8,7 +8,7 @@ int main()
         "/home/xct/yolo-cpp-detector/coco.txt"
     );
 
-    pipeline.run();
+    pipeline.run();   //开始读帧
 
     return 0;
 }
