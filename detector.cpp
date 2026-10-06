@@ -51,7 +51,7 @@ vector<float> Detector::preprocess(Mat& img, int& img_w, int& img_h) {
     resize(img, blob, Size(640, 640));
 
     // 将图像数据转换成32位浮点数，并进行归一化
-    // 原始像素值范围为0~255，这里乘以1/255后变成0~1
+    // 原始像素值范围为0~255，这里乘以1/255后变成0~1                 目的：让输入数据尺度更加适合神经网络数值计算。
     blob.convertTo(blob, CV_32F, 1.0 / 255.0);
 
     // 将OpenCV默认的BGR通道顺序转换为RGB
