@@ -2,145 +2,283 @@ cmake_minimum_required(VERSION 3.18)
 
 project(yolo_cpp_detector)
 
-# ==================== C++ 标准 ====================
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
-# ==================== 构建选项 ====================
+# ============================================================
+# 构建选项
+# ============================================================
 
-# ON  ：编译 TensorRT 后端
-# OFF ：只编译 ONNX Runtime 后端
+# 默认关闭 TensorRT。
+# 当前电脑没有 TensorRT 开发环境时，
+# 仍然可以正常编译 ORT 版本。
+option(ENABLE_TENSORRT
+    "Build TensorRT backend and engine builder"
+    OFF)
+
+# ONNX Runtime 安装目录。
+# 实际使用时通过：
 #
-# 当前 GTX 1050 环境没有 TensorRT 开发库，
-# 因此以后租用合适 GPU 后再开启。
-option(ENABLE_TENSORRT "Build TensorRT backend" OFF)
+# cmake .. -DONNXRUNTIME_ROOT=/path/to/onnxruntime
+#
+# 指定。
+set(ONNXRUNTIME_ROOT
+    ""
+    CACHE PATH
+    "ONNX Runtime root directory")
 
-# ==================== OpenCV ====================
+# TensorRT 安装目录。
+# 只有 ENABLE_TENSORRT=ON 时需要。
+set(TENSORRT_ROOT
+    ""
+    CACHE PATH
+    "TensorRT root directory")
+
+
+# ============================================================
+# 基础依赖
+# ============================================================
 
 find_package(OpenCV REQUIRED)
 
-# ==================== ONNX Runtime ====================
+find_package(CUDAToolkit REQUIRED)
 
-# 根据本机实际安装路径修改
-set(ONNXRUNTIME_ROOT
-    "/home/xct/onnxruntime-linux-x64-gpu-1.21.1"
+
+# ============================================================
+# ONNX Runtime
+# ============================================================
+
+if(NOT ONNXRUNTIME_ROOT)
+    message(FATAL_ERROR
+        "ONNXRUNTIME_ROOT is not set.\n"
+        "Example:\n"
+        "cmake .. -DONNXRUNTIME_ROOT=/home/xct/onnxruntime-linux-x64-gpu-1.18.0")
+endif()
+
+find_path(
+    ONNXRUNTIME_INCLUDE_DIR
+    onnxruntime_cxx_api.h
+    PATHS
+        ${ONNXRUNTIME_ROOT}/include
+    REQUIRED
 )
 
-set(ONNXRUNTIME_INCLUDE_DIR
-    "${ONNXRUNTIME_ROOT}/include"
+find_library(
+    ONNXRUNTIME_LIBRARY
+    onnxruntime
+    PATHS
+        ${ONNXRUNTIME_ROOT}/lib
+    REQUIRED
 )
 
-set(ONNXRUNTIME_LIBRARY_DIR
-    "${ONNXRUNTIME_ROOT}/lib"
-)
 
-# ==================== 头文件 ====================
+# ============================================================
+# 主程序：YOLO Detector
+# ============================================================
 
-include_directories(
-    ${OpenCV_INCLUDE_DIRS}
-    ${ONNXRUNTIME_INCLUDE_DIR}
-    ${PROJECT_SOURCE_DIR}/include
-)
+set(APP_SOURCES
 
-# ==================== 库搜索路径 ====================
-
-link_directories(
-    ${ONNXRUNTIME_LIBRARY_DIR}
-)
-
-# ==================== 核心源文件 ====================
-
-set(SOURCES
     src/main.cpp
+
     src/detector.cpp
+
     src/pipeline.cpp
+
     src/ort_backend.cpp
+
     src/benchmark.cpp
 )
 
-# ==================== TensorRT ====================
+
+# ============================================================
+# TensorRT 后端
+# ============================================================
 
 if(ENABLE_TENSORRT)
 
-    find_path(TENSORRT_INCLUDE_DIR
-        NvInfer.h
-        PATHS
-            /usr/include
-            /usr/local/include
-            /usr/include/x86_64-linux-gnu
-            /usr/local/TensorRT/include
-    )
-
-    find_library(TENSORRT_LIBRARY
-        nvinfer
-        PATHS
-            /usr/lib
-            /usr/lib/x86_64-linux-gnu
-            /usr/local/lib
-            /usr/local/TensorRT/lib
-    )
-
-    if(NOT TENSORRT_INCLUDE_DIR OR NOT TENSORRT_LIBRARY)
+    if(NOT TENSORRT_ROOT)
         message(FATAL_ERROR
-            "TensorRT was requested but not found."
-        )
+            "ENABLE_TENSORRT=ON but TENSORRT_ROOT is not set.")
     endif()
 
-    message(STATUS
-        "TensorRT enabled: ${TENSORRT_INCLUDE_DIR}"
+    find_path(
+        TENSORRT_INCLUDE_DIR
+        NvInfer.h
+        PATHS
+            ${TENSORRT_ROOT}/include
+        REQUIRED
     )
 
-    include_directories(
-        ${TENSORRT_INCLUDE_DIR}
+    find_library(
+        TENSORRT_LIBRARY
+        nvinfer
+        PATHS
+            ${TENSORRT_ROOT}/lib
+        REQUIRED
     )
 
-    list(APPEND SOURCES
+    list(APPEND APP_SOURCES
         src/trt_backend.cpp
-        tools/build_engine.cpp
     )
 
 endif()
 
-# ==================== 主程序 ====================
 
-add_executable(yolo_detector ${SOURCES})
+# ============================================================
+# YOLO Detector 可执行文件
+# ============================================================
 
-# ==================== 链接库 ====================
+add_executable(
+    yolo_detector
+    ${APP_SOURCES}
+)
+
+
+target_include_directories(
+    yolo_detector
+    PRIVATE
+
+    ${PROJECT_SOURCE_DIR}/include
+
+    ${OpenCV_INCLUDE_DIRS}
+
+    ${ONNXRUNTIME_INCLUDE_DIR}
+)
+
 
 target_link_libraries(
     yolo_detector
     PRIVATE
+
     ${OpenCV_LIBS}
-    onnxruntime
+
+    ${ONNXRUNTIME_LIBRARY}
+
+    CUDA::cudart
 )
 
+
+# ============================================================
+# TensorRT 编译配置
+# ============================================================
+
 if(ENABLE_TENSORRT)
+
+    target_include_directories(
+        yolo_detector
+        PRIVATE
+
+        ${TENSORRT_INCLUDE_DIR}
+    )
 
     target_link_libraries(
         yolo_detector
         PRIVATE
+
         ${TENSORRT_LIBRARY}
+    )
+
+    target_compile_definitions(
+        yolo_detector
+        PRIVATE
+
+        ENABLE_TENSORRT
     )
 
 endif()
 
-# ==================== 编译选项 ====================
 
-target_compile_options(
-    yolo_detector
-    PRIVATE
-    -Wall
-    -Wextra
-    -O2
-)
+# ============================================================
+# TensorRT Engine Builder
+# ============================================================
+#
+# 只有启用 TensorRT 时才构建。
+#
+# build_engine：
+#
+# ONNX
+#   ↓
+# Parser（模型翻译员）
+#   ↓
+# Network（生产线设计图）
+#   ↓
+# Builder（建厂工程师）
+#   ↓
+# Engine（已经建好的生产线）
 
-# ==================== 输出信息 ====================
+if(ENABLE_TENSORRT)
 
-message(STATUS "====================================")
-message(STATUS "YOLO C++ Inference Deployment")
-message(STATUS "C++ Standard : C++17")
-message(STATUS "OpenCV       : ${OpenCV_VERSION}")
-message(STATUS "TensorRT     : ${ENABLE_TENSORRT}")
-message(STATUS "====================================")
+    find_path(
+        NVONNXPARSER_INCLUDE_DIR
+        NvOnnxParser.h
+        PATHS
+            ${TENSORRT_ROOT}/include
+        REQUIRED
+    )
+
+    find_library(
+        NVONNXPARSER_LIBRARY
+        nvonnxparser
+        PATHS
+            ${TENSORRT_ROOT}/lib
+        REQUIRED
+    )
+
+
+    add_executable(
+        build_engine
+
+        tools/build_engine.cpp
+
+        tools/int8_calibrator.cpp
+    )
+
+
+    target_include_directories(
+        build_engine
+        PRIVATE
+
+        ${PROJECT_SOURCE_DIR}/tools
+
+        ${TENSORRT_INCLUDE_DIR}
+
+        ${NVONNXPARSER_INCLUDE_DIR}
+
+        ${CUDAToolkit_INCLUDE_DIRS}
+
+        ${OpenCV_INCLUDE_DIRS}
+    )
+
+
+    target_link_libraries(
+        build_engine
+        PRIVATE
+
+        ${TENSORRT_LIBRARY}
+
+        ${NVONNXPARSER_LIBRARY}
+
+        CUDA::cudart
+
+        ${OpenCV_LIBS}
+    )
+
+endif()
+
+
+# ============================================================
+# 编译信息
+# ============================================================
+
+message(STATUS "")
+message(STATUS "========== YOLO C++ Detector ==========")
+message(STATUS "OpenCV            : ${OpenCV_VERSION}")
+message(STATUS "ONNX Runtime      : ${ONNXRUNTIME_LIBRARY}")
+message(STATUS "TensorRT Enabled  : ${ENABLE_TENSORRT}")
+
+if(ENABLE_TENSORRT)
+    message(STATUS "TensorRT Root     : ${TENSORRT_ROOT}")
+endif()
+
+message(STATUS "========================================")
+message(STATUS "")
