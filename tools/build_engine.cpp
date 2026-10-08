@@ -8,6 +8,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <cstdlib>
 
 class BuildLogger : public nvinfer1::ILogger
 {
