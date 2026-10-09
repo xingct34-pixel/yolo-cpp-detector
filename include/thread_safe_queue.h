@@ -13,9 +13,7 @@
 // mutex          → 仓库门锁
 // condition_variable → 仓库铃铛
 // queue          → 仓库货架
-//
-// 本项目采用实时视频处理策略：
-// 队列满时丢掉最旧的数据，而不是阻塞生产者。
+
 
 template<typename T>
 class ThreadSafeQueue
@@ -41,13 +39,7 @@ public:
                 return false;
             }
 
-            // ==================== 实时丢帧策略 ====================
-            //
-            // 队列满：
-            // 丢掉最旧的数据，给最新数据腾位置。
-            //
-            // 对实时视频来说：
-            // 最新画面 > 旧画面
+
             if (queue_.size() >= max_size_)
             {
                 queue_.pop();
