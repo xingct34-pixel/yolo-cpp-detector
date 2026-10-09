@@ -67,10 +67,16 @@ void printHelp()
 }
 
 // ==================== 参数解析模块 ====================
+//parseArgs 从 i = 1 开始遍历，因为 argv[0] 是程序名。
+//遇到 --video、--model 这类选项，就用 argv[++i] 取下一个字符串作为值，再用 continue 进入下一轮。
+//如果 i + 1 >= argc，说明选项后面没有值，直接抛异常。
+//--queue-size 用 std::stoul 转成数字，并检查必须大于 0。
+不认识的参数会抛出"未知参数"。
+--help 会打印帮助并 std::exit(0)。
 
 AppConfig parseArgs(
-    int argc,
-    char* argv[])
+    int argc,    //参数个数
+    char* argv[])            //参数字符串数组
 {
     AppConfig config;
 
@@ -226,6 +232,7 @@ AppConfig parseArgs(
             "未知参数: " + arg);
     }
 
+    //ort=ONNX RUNtime       trt=Tensor RUNtime
     // TensorRT 不使用 ORT CUDA 配置
     if (config.backend ==
         Detector::BackendType::TensorRT)
@@ -237,7 +244,7 @@ AppConfig parseArgs(
 }
 
 // ==================== 主函数模块 ====================
-
+//程序从这里开始
 int main(
     int argc,
     char* argv[])
@@ -254,7 +261,7 @@ int main(
             << "YOLO C++ Inference Deployment\n"
             << "==============================\n";
 
-        Pipeline pipeline(
+        Pipeline pipeline(              //创建pipeline
             config.video_path,
             config.model_path,
             config.classes_path,
@@ -263,7 +270,7 @@ int main(
             config.use_cuda,
             config.queue_size);
 
-        pipeline.run();
+        pipeline.run();         //启动
     }
     catch (const std::exception& e)
     {
