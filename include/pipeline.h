@@ -39,20 +39,16 @@ public:
 
     ~Pipeline() = default;
 
-    // ==================== Pipeline 启动模块 ====================
 
     void run();
 
 private:
-    // ==================== 读取线程模块 ====================
 
     void readLoop();
 
-    // ==================== 推理线程模块 ====================
 
     void inferenceLoop();
 
-    // ==================== 显示模块 ====================
 
     void display();
 
@@ -65,11 +61,18 @@ private:
     ThreadSafeQueue<ResultData>
         result_queue_;
 
-    // ==================== 模型推理模块 ====================
+/*为什么 Detector 是 Pipeline 的成员?
+
+模型加载很慢,必须只做一次,放在构造阶段,而不是每帧加载。
+它的生命周期应该和 Pipeline 一致:Pipeline 存在,模型就在;Pipeline 析构,资源由 RAII 自动释放。
+构造函数里的 model_path、backend_type、engine_path、use_cuda 等参数都是转交给 Detector 的,模型加载失败在 run() 之前就能暴露。
+它只被推理线程使用,不需要对外共享。
+*/
+
+
 
     Detector detector_;
 
-    // ==================== 视频配置模块 ====================
 
     std::string video_path_;
 
