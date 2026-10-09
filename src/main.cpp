@@ -5,6 +5,7 @@
 #include <string>
 
 // ==================== 命令行配置模块 ====================
+//cpp文件里面可以加using namespace std；，后面就不用加std：：了，，.h的头文件不能加，以防出现冲突
 
 struct AppConfig
 {
