@@ -195,3 +195,38 @@ std::string OrtBackend::name() const
 {
     return "ONNX Runtime";
 }
+
+
+/*
+ort_backend.cpp 十个问题对照回答
+
+1. Env
+env_(ORT_LOGGING_LEVEL_WARNING, "YOLO") 创建全局运行环境，日志级别是 WARNING，日志标签是 "YOLO"。它必须比 session_ 活得久，头文件里 env_ 声明在前，所以满足。
+
+2. Session
+session_(env_, model_path.c_str(), makeSessionOptions(use_cuda)) 在构造时就读取 .onnx、解析优化计算图、分配权重内存，之后它就是"已加载好的模型"。
+
+3. 为什么只加载一次
+加载动作全在构造函数里。infer() 只调用 session_.Run()，所以每帧不会重新加载。
+
+4. Input Tensor 怎么创建
+在 infer() 里用 CreateCpu 描述内存位置，再用 CreateTensor<float> 包装 input_data 的内存，不拷贝。const_cast 是因为 ORT 的 API 要求非 const 指针，它不会修改数据。Run() 结束前 input_data 必须有效，这一点在你的代码里成立。
+
+5. input_shape_ 从哪里来
+来自构造函数里的 GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape()。YOLO 通常是 [1,3,640,640]。如果模型导出时用了动态维度，这里会得到 -1，CreateTensor 会出错，需要额外处理。
+
+6. session.Run() 做了什么
+按名字绑定输入输出，在所选 Execution Provider 上按拓扑顺序执行各算子，返回 std::vector<Ort::Value>。
+
+7. 输出为什么能通过 float* 读取
+输出 Tensor 是连续内存，GetTensorMutableData<float>() 返回首地址，GetElementCount() 给出元素个数。前提是模型输出是 float32，如果换成 FP16 模型这里就会读错。
+
+8. CPU 和 CUDA Execution Provider 的区别
+use_cuda 为 true 时，AppendExecutionProvider_CUDA 让算子在 GPU 上跑。输入仍是 CPU 内存，ORT 内部自动做主机到设备的拷贝，输出也会拷回 CPU，所以 float* 才能直接读。如果 CUDA 环境或 onnxruntime-gpu 包不可用，这个调用会抛异常。另外 CUDA 首次运行有预热开销，统计延迟时建议跳过前几帧。
+
+9. SetIntraOpNumThreads(1) 是干什么的
+限制单个算子内部的并行线程数为 1。延迟更稳定，也不抢其他线程的 CPU，代价是纯 CPU 模式下单次推理更慢。启用 CUDA 后，被分配到 CPU 的少量算子也只用 1 个线程。
+
+10. 推理耗时从哪里开始计时，到哪里结束
+计时只包住 session_.Run(...)，起点在 Run 之前，终点在 Run 返回之后。它不包含 Tensor 创建，也不包含最后的输出拷贝，所以 last_latency_ms() 反映的是纯推理耗时，不是整个 infer() 的耗时。
+*/
