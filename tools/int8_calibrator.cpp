@@ -426,3 +426,40 @@ void YoloInt8Calibrator::writeCalibrationCache(
         << cache_file_
         << std::endl;
 }
+/*
+⑭ 为什么 INT8 不能简单地把 FP32 改成 INT8？
+
+FP32 有约 ±3.4×10³⁸ 的动态范围和很高的精度，INT8 只有 256 个离散值（-128~127）。要把浮点数映射到整数，必须先知道"这一层的值大概落在多大范围内"：
+
+q = clamp(round(x / scale), -128, 127)
+scale ≈ 激活值范围 / 127
+权重是固定的，范围可以直接统计。
+激活值取决于输入数据，只有拿真实数据跑一遍才知道范围。
+范围取小了，大值被截断；取大了，小值全被量化成同一个整数，精度损失严重。
+
+所以流程是：校准数据 → 前向推理 → 统计每层激活分布 → 选出 scale（TensorRT 默认用 entropy 校准，通过 KL 散度选截断阈值）→ 生成 INT8 Engine。
+
+⑮ 对应你代码的 6 个问题
+
+1. Calibration Dataset 有什么作用？
+它是 TensorRT 统计各层激活分布的"样本"。loadImagePaths 收集目录里的图片，getBatch 每次喂一个 batch，TensorRT 在构建 engine 时用这些数据跑 FP32 前向并记录每层的数值分布。
+
+2. 为什么需要真实、有代表性的图片？
+scale 完全由这批数据的分布决定。如果校准图和实际部署场景差异大（光照、目标大小、背景不同），算出的范围就会偏，部署后精度明显下降。随机噪声图或全黑图会让 scale 严重失真。一般用几百张覆盖实际场景的图即可。
+
+另外，preprocessImage 里的 letterbox、BGR→RGB、除以 255、HWC→CHW，必须和推理时的预处理完全一致，否则统计的是另一种分布。
+
+3. 为什么 GPU 上需要 calibration buffer？
+TensorRT 在 GPU 上执行校准用的前向推理，要求输入张量在显存中。device_input_ 就是这块缓冲区，在构造函数里用 cudaMalloc 一次性分配 batch_size × 3 × H × W × sizeof(float)，每个 batch 复用，避免反复申请释放。bindings[0] = device_input_ 就是把这块显存地址告诉 TensorRT。
+
+4. 为什么需要 H2D？
+OpenCV 读图和预处理都在 CPU 内存里（host_batch_），而 GPU 不能直接访问它。cudaMemcpy(..., cudaMemcpyHostToDevice) 把一个 batch 的数据从主机拷到 device_input_，TensorRT 才能读到。
+
+5. Calibration Cache 是干什么的？
+它保存校准的结果，即每个张量对应的量化 scale。writeCalibrationCache 在校准完成后由 TensorRT 回调写入文件，readCalibrationCache 在构建时回调读取。
+
+6. 为什么下次可以直接读取缓存？
+校准是最耗时的一步（要读图、预处理、跑很多个 batch）。scale 只取决于网络结构和校准数据，这两者不变，结果就不变。readCalibrationCache 若读到有效缓存，返回指针和长度，TensorRT 就跳过 getBatch，直接用缓存里的 scale 构建 INT8 engine，几秒内完成。
+
+需要注意：如果更换了模型、修改了网络结构、预处理方式或校准数据，要删除旧缓存重新校准，否则会沿用过期的 scale。
+*/
