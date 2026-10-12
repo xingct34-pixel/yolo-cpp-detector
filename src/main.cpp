@@ -66,13 +66,15 @@ void printHelp()
         << "      显示帮助\n\n";
 }
 
-// ==================== 参数解析模块 ====================
-//parseArgs 从 i = 1 开始遍历，因为 argv[0] 是程序名。
-//遇到 --video、--model 这类选项，就用 argv[++i] 取下一个字符串作为值，再用 continue 进入下一轮。
-//如果 i + 1 >= argc，说明选项后面没有值，直接抛异常。
-//--queue-size 用 std::stoul 转成数字，并检查必须大于 0。
+/*==================== 参数解析模块 ====================
+parseArgs 从 i = 1 开始遍历，因为 argv[0] 是程序名。
+遇到 --video、--model 这类选项，就用 argv[++i] 取下一个字符串作为值，再用 continue 进入下一轮。
+如果 i + 1 >= argc，说明选项后面没有值，直接抛异常。
+--queue-size 用 std::stoul 转成数字，并检查必须大于 0。
 不认识的参数会抛出"未知参数"。
 --help 会打印帮助并 std::exit(0)。
+parse解析  args参数
+*/
 
 AppConfig parseArgs(
     int argc,    //参数个数
