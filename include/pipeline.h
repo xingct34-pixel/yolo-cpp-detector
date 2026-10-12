@@ -64,8 +64,7 @@ private:
 /*为什么 Detector 是 Pipeline 的成员?
 
 模型加载很慢,必须只做一次,放在构造阶段,而不是每帧加载。
-它的生命周期应该和 Pipeline 一致:Pipeline 存在,模型就在;Pipeline 析构,资源由 RAII 自动释放。
-构造函数里的 model_path、backend_type、engine_path、use_cuda 等参数都是转交给 Detector 的,模型加载失败在 run() 之前就能暴露。
+,模型加载失败在 run() 之前就能暴露。
 它只被推理线程使用,不需要对外共享。
 */
 
@@ -87,6 +86,11 @@ private:
     std::atomic<bool> stop_requested_{
         false
     };
+     /*
+     8. stop_requested_ 是干什么的?
+      它是跨线程的停止信号:视频读完、用户按键退出或出错时置为 true,各线程循环检查它然后退出。用 std::atomic<bool> 是为了避免多线程读写同一个普通 bool 带来的数据竞争。
+      它和队列的 close() 配合使用:标志告诉线程"该停了",close() 负责唤醒正在队列上阻塞等待的线程。
+     */
 
     // ==================== 帧计数模块 ====================
 
@@ -106,3 +110,5 @@ private:
 
     Benchmark benchmark_;
 };
+/*
+.h是声明
