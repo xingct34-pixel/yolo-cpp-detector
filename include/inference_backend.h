@@ -39,7 +39,7 @@ public:
 };
 
 
-/*不同推理框架的 API 完全不同
+/*不懂
 InferenceBackend 就是把这个共性提炼出来的契约，只暴露三件事：
 
 infer()：输入 CHW float，输出原始张量
@@ -50,7 +50,7 @@ name()：后端名称
 */
 
 
-/*
+/*不懂
 2. 为什么 Detector 不直接依赖 OrtBackend？
 
 如果 Detector 持有的是 OrtBackend，会出现几个问题：
@@ -67,7 +67,7 @@ Detector ──依赖──▶ InferenceBackend ◀──实现── OrtBackend
 Detector 只认识接口。只有 createBackend() 这一个地方知道具体类，具体类的头文件只在它的 .cpp 里包含即可。
 */
 
-/*
+/*不懂
 3. virtual 是干什么的？
 
 virtual 开启运行时多态：通过基类指针调用函数时，实际执行哪个版本，由对象的真实类型在运行时决定，而不是由指针的静态类型决定。
@@ -81,7 +81,7 @@ backend_->infer(input);   // 实际调用的是 OrtBackend::infer
 实现层面是靠每个对象里的虚表指针（vptr）找到虚函数表，多一次间接调用，开销很小，相比一次模型推理（毫秒级）可以忽略。
 */
 
-/*
+/*不懂
 为什么 infer() 是纯虚函数？
 
 = 0 表示这个函数在基类里没有实现，且子类必须实现。这样做有两层作用：
@@ -95,7 +95,7 @@ last_latency_ms() 和 name() 也是纯虚的，道理相同，它们同样是每
 */
 
 /*
-5. 为什么需要 virtual ~InferenceBackend()？
+5. 为什么需要 virtual ~InferenceBackend()？不懂
 
 这是多态基类里最容易踩的坑。Detector 持有的是 unique_ptr<InferenceBackend>，销毁时通过基类指针删除对象：
 
@@ -106,7 +106,7 @@ last_latency_ms() 和 name() 也是纯虚的，道理相同，它们同样是每
 */
 
 /*
-6. 这种设计有什么好处？
+6. 这种设计有什么好处？  模块化，耦合性低
 好处	说明
 解耦	Detector 不依赖任何具体推理框架，编译依赖干净
 开闭原则	加新后端只需新增一个类并在工厂里注册，不改 Detector
