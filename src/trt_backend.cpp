@@ -439,13 +439,12 @@ std::string TrtBackend::name() const
     return "TensorRT";
 }
 /*
-13 个问题
 
 1. Engine 怎么加载？
 用 ifstream 以二进制方式把整个 .engine 文件读进 std::vector<char>，再交给 runtime_->deserializeCudaEngine(buffer.data(), buffer.size())。.engine 文件只是序列化后的字节，必须反序列化才能得到可运行的生产线。
 
 2. Runtime 干什么？
-Runtime（工厂管理系统）由 createInferRuntime(logger_) 创建，唯一的职责是把字节流还原成 Engine。它必须比 Engine 活得久，所以作为成员变量保存。
+Runtime（工厂管理系统，唯一的职责是把字节流还原成 Engine。它必须比 Engine 活得久，所以作为成员变量保存。
 
 3. Engine 干什么？
 Engine（已经建好的生产线）是 TensorRT 优化后的成品，包含算子融合、选好的 kernel 和权重。它建成后不可变，创建代价高，所以只建一次。代码里还用它查询输入输出 Tensor 的名字、形状和模式（inspectTensors）。
@@ -460,7 +459,7 @@ Context（这次生产任务）保存一次推理的可变状态：输入输出�
 在 GPU 显存里申请仓库。代码为输入和输出各申请 元素数 × sizeof(float) 字节，在构造函数里申请一次，之后每次推理复用，避免反复申请的开销。申请后还要用 setTensorAddress 告诉 Context 这两个仓库的位置。
 
 7. H2D 是什么？
-Host to Device，仓库 → 工厂。cudaMemcpyAsync(..., cudaMemcpyHostToDevice, stream_) 把 CPU 内存里的输入数据搬进 GPU 的输入仓库。GPU 只能直接处理自己显存里的数据。
+Host to Device，仓库 → 工厂。 把 CPU 内存里的输入数据搬进 GPU 的输入仓库。GPU 只能直接处理自己显存里的数据。
 
 8. enqueueV3() 是什么？
 它把"执行这条生产线"的任务提交到指定 Stream，是异步的，提交完立刻返回，GPU 此时可能还没开始算。返回的 bool 只表示提交是否成功，不表示计算是否成功。
