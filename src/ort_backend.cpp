@@ -198,16 +198,15 @@ std::string OrtBackend::name() const
 
 
 /*
-ort_backend.cpp 十个问题对照回答
 
-1. Env
-env_(ORT_LOGGING_LEVEL_WARNING, "YOLO") 创建全局运行环境，日志级别是 WARNING，日志标签是 "YOLO"。它必须比 session_ 活得久，头文件里 env_ 声明在前，所以满足。
+
+
 
 2. Session
 session_(env_, model_path.c_str(), makeSessionOptions(use_cuda)) 在构造时就读取 .onnx、解析优化计算图、分配权重内存，之后它就是"已加载好的模型"。
 
 3. 为什么只加载一次
-加载动作全在构造函数里。infer() 只调用 session_.Run()，所以每帧不会重新加载。
+加载动作全在构造函数里，每帧不会重新加载。
 
 4. Input Tensor 怎么创建
 在 infer() 里用 CreateCpu 描述内存位置，再用 CreateTensor<float> 包装 input_data 的内存，不拷贝。const_cast 是因为 ORT 的 API 要求非 const 指针，它不会修改数据。Run() 结束前 input_data 必须有效，这一点在你的代码里成立。
