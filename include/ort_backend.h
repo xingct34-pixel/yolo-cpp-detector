@@ -67,10 +67,9 @@ private:
     double last_latency_ms_ = 0.0;
 };
 /*
-先说明一点：你只贴了 ort_backend.h，.cpp 没贴，所以下面关于 .cpp 的回答是 ONNX Runtime 的标准写法，具体实现请对照你自己的代码确认。
 
-⑧ 头文件：三个角色
-成员	角色
+
+
 Ort::Env env_	负责 Runtime 环境：全局状态、日志、内部线程池
 Ort::Session session_	代表已加载好的模型：解析后的计算图、权重、选定的 Execution Provider
 session_.Run()	真正执行推理的是 Session 的 Run()
