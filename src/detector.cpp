@@ -263,7 +263,7 @@ cv::Mat Detector::detect(
         backend_->infer(input);
 
     // ==================== 后处理模块 ====================
-
+    //postprocess()	解析预测结果、筛选目标、去除重复框、恢复坐标
     postprocess(
         result,
         output,
