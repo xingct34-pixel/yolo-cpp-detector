@@ -336,6 +336,9 @@ OpenCV 的 imshow / waitKey 这类 GUI 函数在很多平台(尤其是 macOS、�
 一个仍可 join 的 std::thread 被销毁时会调用 std::terminate,程序直接崩溃。
 需要等推理线程把已有数据处理完,统计数据才完整。
 
+join
+这只是主线程等待它们结束的顺序，不是这些线程开始执行的顺序。
+
 12. 如果把一个 inference thread 改成两个,会发生什么?
 
 吞吐可能提高,前提是推理有可并行的资源,比如 GPU 有空闲算力或 CPU 核数足够。
