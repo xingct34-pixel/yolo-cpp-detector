@@ -1,3 +1,5 @@
+//负责检测流程，包括前处理、后处理
+
 #include "detector.h"
 
 #include "ort_backend.h"
