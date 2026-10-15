@@ -1,3 +1,5 @@
+//规定推理后端必须提供哪些功能
+
 #pragma once
 
 #include <string>
