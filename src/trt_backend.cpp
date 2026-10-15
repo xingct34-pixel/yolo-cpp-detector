@@ -481,5 +481,45 @@ device_output_ 是 GPU 显存地址，和 CPU 内存不在同一个地址空间�
 
 提交推理任务的 CPU 开销
 GPU 上推理的实际执行时间
+
+*/
+
+/*
+2. TensorRT 的 Engine 是什么？
+TensorRT 可以读取受支持的模型，并针对目标 GPU 和指定的构建配置进行优化，生成 Engine（已经构建好的推理执行计划）。
+可以把它理解成：
+- Builder（建厂工程师）：负责分析模型、选择优化策略并构建 Engine。
+- Engine（已建好的生产线）：包含经过优化的推理执行计划。
+- Runtime（工厂管理系统）：负责加载 Engine 并管理执行所需的运行环境。
+- Execution Context（本次生产任务的执行上下文）：保存一次推理执行所需的状态。
+典型流程：
+
+ONNX 模型
+    ↓
+TensorRT Builder
+    ↓
+优化与构建
+    ↓
+TensorRT Engine
+    ↓
+创建执行上下文
+    ↓
+输入数据并执行推理
+    ↓
+获得输出
+
+
+通常不会在每一帧视频上重新构建 Engine。构建通常是独立的准备阶段，之后重复使用构建好的 Engine 进行推理。
+3. 为什么 TensorRT 可能更快？
+TensorRT 可以针对 NVIDIA GPU 做多种优化，例如：
+- 融合部分算子，减少中间结果写入和读取。
+- 选择适合硬件的计算实现。
+- 使用 FP16 等较低精度进行推理（需要模型和硬件支持，并验证精度）。
+- 优化显存使用和执行流程。
+但必须注意：
+TensorRT 不保证在所有模型、所有 GPU 和所有配置下都比 ONNX Runtime 快。
+实际速度取决于模型结构、GPU 型号、精度配置、输入尺寸、算子支持情况、内存拷贝、批次大小和运行时设置等因素。
+ONNX Runtime 本身也可以使用不同的 Execution Provider（执行提供程序），例如 CUDA Execution Provider。因此，比较时不能简单理解成“ONNX Runtime 只能用 CPU，而 TensorRT 才能用 GPU”。
+*/
 在同一个 Stream 上排在推理前面、尚未完成的 H2D 搬运
 */
