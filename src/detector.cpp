@@ -1,5 +1,5 @@
 //负责检测流程，包括前处理、后处理
-
+//智能指针的作用是管理对象的生命周期，减少资源泄露
 #include "detector.h"
 
 #include "ort_backend.h"
