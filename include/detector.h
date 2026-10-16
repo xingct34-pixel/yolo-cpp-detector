@@ -131,4 +131,8 @@ private:
     std::unique_ptr<InferenceBackend>
         backend_;
 };
-
+/*
+FP32	32 bit	4 字节
+FP16	16 bit	2 字节
+INT8	8 bit	1 字节
+    */
