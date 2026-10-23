@@ -3,7 +3,10 @@
 #include "detector.h"
 
 #include "ort_backend.h"
+
+#ifdef ENABLE_TENSORRT
 #include "trt_backend.h"
+#endif
 
 #include <opencv2/dnn.hpp>
 
@@ -80,8 +83,8 @@ Detector::createBackend(
             use_cuda);
     }
 
-    if (backend_type ==
-        BackendType::TensorRT)
+#ifdef ENABLE_TENSORRT
+    if (backend_type == BackendType::TensorRT)
     {
         if (engine_path.empty())
         {
@@ -92,6 +95,14 @@ Detector::createBackend(
         return std::make_unique<TrtBackend>(
             engine_path);
     }
+#else
+    if (backend_type == BackendType::TensorRT)
+    {
+        throw std::runtime_error(
+            "当前构建未启用 TensorRT，请使用 ORT 后端，"
+            "或将 ENABLE_TENSORRT 设为 ON。");
+    }
+#endif
 
     throw std::runtime_error(
         "未知的推理后端。");
@@ -730,7 +741,6 @@ Soft-NMS：不直接删除重叠框，而是按 IoU 大小衰减其置信度，�
 
 置信度过滤：看单个框，用一个分数阈值（如 0.25）去掉"不太像目标"的框，解决的是误检、背景噪声问题。它不考虑框与框之间的关系。
 NMS：看框与框之间的空间关系，去掉"对同一目标的重复预测"，解决的是冗余重复问题。它不判断框本身是否可信。
-*/
 */
 
 /*
