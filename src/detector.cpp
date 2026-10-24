@@ -305,8 +305,11 @@ void Detector::postprocess(
     constexpr int NUM_CLASSES = 80;
     constexpr int NUM_BOXES = 8400;
 
-    if (output.size() <
-        4 * NUM_BOXES)
+    const auto expected_output_size =
+        static_cast<std::vector<float>::size_type>(
+            (4 + NUM_CLASSES) * NUM_BOXES);
+
+    if (output.size() != expected_output_size)
     {
         throw std::runtime_error(
             "YOLO 输出数据大小异常。");
