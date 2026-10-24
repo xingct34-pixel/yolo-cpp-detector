@@ -174,6 +174,18 @@ std::vector<float> OrtBackend::infer(
         outputs[0]
             .GetTensorTypeAndShapeInfo();
 
+    const auto output_shape =
+        output_info.GetShape();
+
+    if (output_shape.size() != 3 ||
+        output_shape[0] != 1 ||
+        output_shape[1] != 84 ||
+        output_shape[2] != 8400)
+    {
+        throw std::runtime_error(
+            "YOLO 输出 Tensor 形状异常，期望 [1, 84, 8400]。");
+    }
+
     const size_t output_count =
         output_info.GetElementCount();
 
