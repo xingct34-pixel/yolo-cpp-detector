@@ -104,6 +104,7 @@ TrtBackend（TensorRT 推理后端）
 ```
 
 更详细的模块关系见 `docs/architecture.md`。
+性能测试数据与线程数实验见 `docs/performance_benchmark.md`。
 
 ## 四、运行环境
 

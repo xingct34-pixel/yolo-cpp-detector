@@ -108,5 +108,9 @@ private:
 
     // ==================== 性能统计模块 ====================
 
+    // 模型运行时和各阶段的独立统计。
     Benchmark benchmark_;
+    Benchmark preprocess_benchmark_;
+    Benchmark backend_call_benchmark_;
+    Benchmark postprocess_benchmark_;
 };

@@ -73,6 +73,12 @@ public:
 
     double last_inference_ms() const;
 
+    double last_preprocess_ms() const;
+
+    double last_backend_call_ms() const;
+
+    double last_postprocess_ms() const;
+
     std::string backend_name() const;
 
 private:
@@ -130,6 +136,11 @@ private:
 
     std::unique_ptr<InferenceBackend>
         backend_;
+
+    // 最近一次检测的阶段耗时，单位为毫秒。
+    double last_preprocess_ms_ = 0.0;
+    double last_backend_call_ms_ = 0.0;
+    double last_postprocess_ms_ = 0.0;
 };
 /*
 FP32	32 bit	4 字节

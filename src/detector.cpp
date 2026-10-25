@@ -11,6 +11,7 @@
 #include <opencv2/dnn.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -258,10 +259,12 @@ std::vector<float> Detector::preprocess(
 cv::Mat Detector::detect(
     const cv::Mat& image)
 {
+    // 预处理计时：包含图像复制和 preprocess()。
+    const auto preprocess_start =
+        std::chrono::steady_clock::now();
+
     cv::Mat result =
         image.clone();
-
-    // ==================== 预处理 ====================
 
     LetterboxInfo info;
 
@@ -270,17 +273,42 @@ cv::Mat Detector::detect(
             image,
             info);
 
-    // ==================== 推理模块 ====================
+    const auto preprocess_end =
+        std::chrono::steady_clock::now();
+
+    last_preprocess_ms_ =
+        std::chrono::duration<double, std::milli>(
+            preprocess_end - preprocess_start).count();
+
+    // 后端调用计时：包含 backend_->infer() 的完整调用。
+    const auto backend_start =
+        std::chrono::steady_clock::now();
 
     std::vector<float> output =
         backend_->infer(input);
 
-    // ==================== 后处理模块 ====================
-    //postprocess()	解析预测结果、筛选目标、去除重复框、恢复坐标
+    const auto backend_end =
+        std::chrono::steady_clock::now();
+
+    last_backend_call_ms_ =
+        std::chrono::duration<double, std::milli>(
+            backend_end - backend_start).count();
+
+    // 后处理计时：包含输出解析、NMS 和绘制。
+    const auto postprocess_start =
+        std::chrono::steady_clock::now();
+
     postprocess(
         result,
         output,
         info);
+
+    const auto postprocess_end =
+        std::chrono::steady_clock::now();
+
+    last_postprocess_ms_ =
+        std::chrono::duration<double, std::milli>(
+            postprocess_end - postprocess_start).count();
 
     return result;
 }
@@ -619,6 +647,21 @@ double Detector::last_inference_ms() const
 std::string Detector::backend_name() const
 {
     return backend_->name();
+}
+
+double Detector::last_preprocess_ms() const
+{
+    return last_preprocess_ms_;
+}
+
+double Detector::last_backend_call_ms() const
+{
+    return last_backend_call_ms_;
+}
+
+double Detector::last_postprocess_ms() const
+{
+    return last_postprocess_ms_;
 }
 
 /*

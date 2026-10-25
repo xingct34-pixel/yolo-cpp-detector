@@ -1,6 +1,7 @@
 #include "pipeline.h"
 
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <thread>
 
@@ -134,8 +135,19 @@ void Pipeline::inferenceLoop()
 
         // ==================== Benchmark ====================
 
+        // ONNX Runtime session.Run() 的运行时耗时。
         benchmark_.record(
             detector_.last_inference_ms());
+
+        // Detector 各阶段的独立耗时。
+        preprocess_benchmark_.record(
+            detector_.last_preprocess_ms());
+
+        backend_call_benchmark_.record(
+            detector_.last_backend_call_ms());
+
+        postprocess_benchmark_.record(
+            detector_.last_postprocess_ms());
 
         // ==================== 结果入队 ====================
 
@@ -221,6 +233,28 @@ void Pipeline::display()
 
 void Pipeline::run()
 {
+    // ==================== 推理预热模块 ====================
+    // 预热不计入正式 Pipeline 耗时或 Benchmark 样本。
+
+    constexpr int WARMUP_ITERATIONS = 5;
+
+    cv::Mat warmup_image(
+        640,
+        640,
+        CV_8UC3,
+        cv::Scalar(0, 0, 0));
+
+    for (int i = 0; i < WARMUP_ITERATIONS; ++i)
+    {
+        (void)detector_.detect(warmup_image);
+    }
+
+    std::cout
+        << "模型预热完成："
+        << WARMUP_ITERATIONS
+        << " 次"
+        << std::endl;
+
     const auto start =
         std::chrono::steady_clock::now();
 
@@ -312,6 +346,38 @@ void Pipeline::run()
 
     const std::string backend_name = detector_.backend_name();
     benchmark_.print(backend_name.c_str());
+
+    // 各阶段使用相同的统计口径，便于横向比较。
+    const auto print_stage = [](
+        const char* stage,
+        const Benchmark& stats)
+    {
+        std::cout
+            << "\n========== " << stage << " ==========\n"
+            << "Samples: " << stats.count() << '\n';
+
+        if (stats.count() == 0)
+        {
+            std::cout
+                << "没有可用的计时数据。\n"
+                << "==============================\n";
+            return;
+        }
+
+        std::cout << std::fixed << std::setprecision(3);
+
+        std::cout
+            << "Average: " << stats.average() << " ms\n"
+            << "P50:     " << stats.p50() << " ms\n"
+            << "P95:     " << stats.p95() << " ms\n"
+            << "Min:     " << stats.min() << " ms\n"
+            << "Max:     " << stats.max() << " ms\n"
+            << "==============================\n";
+    };
+
+    print_stage("Preprocess", preprocess_benchmark_);
+    print_stage("Backend API call", backend_call_benchmark_);
+    print_stage("Postprocess", postprocess_benchmark_);
 }
 
 /*

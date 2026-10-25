@@ -1,4 +1,5 @@
 #include "ort_backend.h"
+#include <cstdlib>
 
 #include <chrono>
 #include <iostream>
@@ -13,7 +14,33 @@ OrtBackend::makeSessionOptions(
     Ort::SessionOptions options;
 
     // 控制 CPU 线程数量
-    options.SetIntraOpNumThreads(1);
+    int intra_op_threads = 3;
+
+    if (const char* env_value =
+            std::getenv("YOLO_ORT_INTRA_OP_THREADS"))
+    {
+        char* end = nullptr;
+        const long parsed =
+            std::strtol(env_value, &end, 10);
+
+        if (end == env_value ||
+            *end != 0 ||
+            parsed < 1 ||
+            parsed > 64)
+        {
+            throw std::invalid_argument(
+                "YOLO_ORT_INTRA_OP_THREADS must be an integer from 1 to 64.");
+        }
+
+        intra_op_threads = static_cast<int>(parsed);
+    }
+
+    options.SetIntraOpNumThreads(intra_op_threads);
+
+    std::cout
+        << "ONNX Runtime intra-op threads: "
+        << intra_op_threads
+        << std::endl;
 
     // ==================== CUDA Execution Provider 模块 ====================
     //
