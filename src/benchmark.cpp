@@ -1,6 +1,7 @@
 #include "benchmark.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -8,7 +9,7 @@
 void Benchmark::record(
     double latency_ms)
 {
-    if (latency_ms < 0.0)
+    if (latency_ms < 0.0 || !std::isfinite(latency_ms))
     {
         return;
     }
