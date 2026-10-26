@@ -7,6 +7,8 @@
 #include <opencv2/opencv.hpp>
 
 #include <atomic>
+#include <exception>
+#include <mutex>
 #include <string>
 
 // ==================== Pipeline 数据结构模块 ====================
@@ -43,6 +45,8 @@ public:
     void run();
 
 private:
+
+    void requestStop(std::exception_ptr error = nullptr);
 
     void readLoop();
 
@@ -91,6 +95,10 @@ private:
       它是跨线程的停止信号:视频读完、用户按键退出或出错时置为 true,各线程循环检查它然后退出。用 std::atomic<bool> 是为了避免多线程读写同一个普通 bool 带来的数据竞争。
       它和队列的 close() 配合使用:标志告诉线程"该停了",close() 负责唤醒正在队列上阻塞等待的线程。
      */
+
+    // 保存第一个工作线程异常，主线程 join 后统一重新抛出。
+    std::mutex worker_exception_mutex_;
+    std::exception_ptr worker_exception_;
 
     // ==================== 帧计数模块 ====================
 

@@ -1,6 +1,7 @@
 #include "pipeline.h"
 
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -218,14 +219,31 @@ AppConfig parseArgs(
                     "--queue-size 缺少参数。");
             }
 
-            config.queue_size =
-                std::stoul(argv[++i]);
+            const std::string value =
+                argv[++i];
 
-            if (config.queue_size == 0)
+            if (value.empty() ||
+                value.find_first_not_of("0123456789") !=
+                    std::string::npos)
             {
                 throw std::runtime_error(
-                    "queue-size 必须大于 0。");
+                    "queue-size 必须是大于 0 的十进制整数。");
             }
+
+            std::size_t parsed_chars = 0;
+            const unsigned long long parsed =
+                std::stoull(value, &parsed_chars);
+
+            if (parsed_chars != value.size() ||
+                parsed == 0 ||
+                parsed > std::numeric_limits<std::size_t>::max())
+            {
+                throw std::runtime_error(
+                    "queue-size 超出允许范围或不是有效正整数。");
+            }
+
+            config.queue_size =
+                static_cast<std::size_t>(parsed);
 
             continue;
         }

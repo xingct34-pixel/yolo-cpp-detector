@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 #include <utility>
 
 // ==================== 线程安全队列模块 ====================
@@ -25,6 +26,11 @@ public:
         size_t max_size)
         : max_size_(max_size)
     {
+        if (max_size_ == 0)
+        {
+            throw std::invalid_argument(
+                "ThreadSafeQueue capacity must be greater than zero.");
+        }
     }
 
     // ==================== 写入模块 ====================

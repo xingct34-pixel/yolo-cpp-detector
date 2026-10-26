@@ -1,9 +1,12 @@
 #include "pipeline.h"
 
 #include <chrono>
+#include <exception>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <thread>
+#include <stdexcept>
 
 /*
 1. 为什么 Pipeline 要分三个阶段?
@@ -32,6 +35,25 @@ Pipeline::Pipeline(
 {
 }
 
+void Pipeline::requestStop(std::exception_ptr error)
+{
+    stop_requested_.store(true);
+
+    if (error)
+    {
+        std::lock_guard<std::mutex> lock(
+            worker_exception_mutex_);
+
+        if (!worker_exception_)
+        {
+            worker_exception_ = error;
+        }
+    }
+
+    frame_queue_.close();
+    result_queue_.close();
+}
+
 // ==================== 读取线程模块 ====================
 
 void Pipeline::readLoop()
@@ -41,14 +63,8 @@ void Pipeline::readLoop()
 
     if (!cap.isOpened())
     {
-        std::cerr
-            << "视频打开失败："
-            << video_path_
-            << std::endl;
-
-        frame_queue_.close();
-
-        return;
+        throw std::runtime_error(
+            "视频打开失败：" + video_path_);
     }
 
     int frame_id = 0;
@@ -229,10 +245,7 @@ void Pipeline::display()
 
         if (key == 27)
         {
-            stop_requested_ = true;
-
-            frame_queue_.close();
-            result_queue_.close();
+            requestStop();
 
             break;
         }
@@ -270,24 +283,49 @@ void Pipeline::run()
     const auto start =
         std::chrono::steady_clock::now();
 
-    // ==================== 创建读取线程 ====================
+    // ==================== 创建工作线程 ====================
 
-    std::thread read_thread(
-        &Pipeline::readLoop,
-        this);
+    std::thread read_thread;
+    std::thread inference_thread;
 
-    // ==================== 创建推理线程 ====================
+    try
+    {
+        // 异常不能逃出 std::thread 入口，否则会触发 std::terminate。
+        read_thread = std::thread(
+            [this]
+            {
+                try
+                {
+                    readLoop();
+                }
+                catch (...)
+                {
+                    requestStop(std::current_exception());
+                }
+            });
 
-    std::thread inference_thread(
-        &Pipeline::inferenceLoop,
-        this);
+        inference_thread = std::thread(
+            [this]
+            {
+                try
+                {
+                    inferenceLoop();
+                }
+                catch (...)
+                {
+                    requestStop(std::current_exception());
+                }
+            });
 
-    // ==================== 主线程负责显示 ====================
-    //
-    // GUI（图形界面）通常要求在主线程处理。
-    // 因此这里不再创建 display thread。
-
-    display();
+        // GUI 显示仍然放在主线程。
+        display();
+    }
+    catch (...)
+    {
+        // 包括显示失败或线程创建失败。
+        // 先通知停止，随后统一 join 已经启动的线程。
+        requestStop(std::current_exception());
+    }
 
     // ==================== 等待线程结束 ====================
     //
@@ -305,6 +343,20 @@ void Pipeline::run()
     if (inference_thread.joinable())
     {
         inference_thread.join();
+    }
+
+    std::exception_ptr worker_error;
+
+    {
+        std::lock_guard<std::mutex> lock(
+            worker_exception_mutex_);
+
+        worker_error = worker_exception_;
+    }
+
+    if (worker_error)
+    {
+        std::rethrow_exception(worker_error);
     }
 
     const auto end =
