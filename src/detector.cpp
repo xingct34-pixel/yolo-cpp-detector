@@ -158,6 +158,9 @@ std::vector<float> Detector::preprocess(
 
     // ==================== Resize 模块 ====================
 
+    const auto resize_start =
+        std::chrono::steady_clock::now();
+
     cv::Mat resized;
 
     cv::resize(
@@ -166,6 +169,13 @@ std::vector<float> Detector::preprocess(
         cv::Size(
             resized_width,
             resized_height));
+
+    const auto resize_end =
+        std::chrono::steady_clock::now();
+
+    last_resize_ms_ =
+        std::chrono::duration<double, std::milli>(
+            resize_end - resize_start).count();
 
     // ==================== Padding 模块 ====================
 
@@ -181,6 +191,9 @@ std::vector<float> Detector::preprocess(
 
     info.pad_x = pad_x;
     info.pad_y = pad_y;
+
+    const auto padding_start =
+        std::chrono::steady_clock::now();
 
     cv::Mat letterboxed;
 
@@ -201,55 +214,60 @@ std::vector<float> Detector::preprocess(
             114,
             114));
 
-    // ==================== 类型转换模块 ====================
+    const auto padding_end =
+        std::chrono::steady_clock::now();
 
-    cv::Mat float_image;
+    last_padding_ms_ =
+        std::chrono::duration<double, std::milli>(
+            padding_end - padding_start).count();
 
-    letterboxed.convertTo(
-        float_image,
-        CV_32FC3,
-        1.0 / 255.0);
-
-    // ==================== BGR → RGB 模块 ====================
-
-    cv::cvtColor(
-        float_image,
-        float_image,
-        cv::COLOR_BGR2RGB);
-
-    // ==================== HWC → CHW 模块 ====================
+    // ==================== Tensor 数据转换模块 ====================
     //
-    // OpenCV 默认：
-    // HWC = Height × Width × Channel
-    //
-    // YOLO Tensor：
-    // CHW = Channel × Height × Width
+    // 一次完成归一化、BGR -> RGB 和 HWC -> CHW，
+    // 减少中间 Mat 对象与重复的数据遍历。
 
-    std::vector<cv::Mat> channels;
+    const auto tensor_prepare_start =
+        std::chrono::steady_clock::now();
 
-    cv::split(
-        float_image,
-        channels);
+    cv::Mat blob;
 
-    std::vector<float> input_data;
+    cv::dnn::blobFromImage(
+        letterboxed,
+        blob,
+        1.0 / 255.0,
+        cv::Size(),
+        cv::Scalar(),
+        true,
+        false,
+        CV_32F);
 
-    input_data.reserve(
-        3 *
+    const std::size_t expected_elements =
+        static_cast<std::size_t>(3) *
         INPUT_WIDTH *
-        INPUT_HEIGHT);
+        INPUT_HEIGHT;
 
-    for (const auto& channel :
-         channels)
+    if (blob.empty() ||
+        blob.type() != CV_32F ||
+        !blob.isContinuous() ||
+        blob.total() != expected_elements)
     {
-        input_data.insert(
-            input_data.end(),
-            reinterpret_cast<float*>(
-                channel.data),
-            reinterpret_cast<float*>(
-                channel.data) +
-                INPUT_WIDTH *
-                INPUT_HEIGHT);
+        throw std::runtime_error(
+            "模型输入 Blob 的类型、连续性或数据大小异常。");
     }
+
+    const float* blob_data =
+        blob.ptr<float>();
+
+    std::vector<float> input_data(
+        blob_data,
+        blob_data + blob.total());
+
+    const auto tensor_prepare_end =
+        std::chrono::steady_clock::now();
+
+    last_tensor_prepare_ms_ =
+        std::chrono::duration<double, std::milli>(
+            tensor_prepare_end - tensor_prepare_start).count();
 
     return input_data;
 }
@@ -259,14 +277,25 @@ std::vector<float> Detector::preprocess(
 cv::Mat Detector::detect(
     const cv::Mat& image)
 {
-    // 预处理计时：包含图像复制和 preprocess()。
-    const auto preprocess_start =
+    // 单独统计图像深拷贝耗时。
+    const auto image_clone_start =
         std::chrono::steady_clock::now();
 
     cv::Mat result =
         image.clone();
 
+    const auto image_clone_end =
+        std::chrono::steady_clock::now();
+
+    last_image_clone_ms_ =
+        std::chrono::duration<double, std::milli>(
+            image_clone_end - image_clone_start).count();
+
     LetterboxInfo info;
+
+    // 仅统计 preprocess() 本身的耗时。
+    const auto preprocess_start =
+        std::chrono::steady_clock::now();
 
     std::vector<float> input =
         preprocess(
@@ -649,9 +678,29 @@ std::string Detector::backend_name() const
     return backend_->name();
 }
 
+double Detector::last_image_clone_ms() const
+{
+    return last_image_clone_ms_;
+}
+
 double Detector::last_preprocess_ms() const
 {
     return last_preprocess_ms_;
+}
+
+double Detector::last_resize_ms() const
+{
+    return last_resize_ms_;
+}
+
+double Detector::last_padding_ms() const
+{
+    return last_padding_ms_;
+}
+
+double Detector::last_tensor_prepare_ms() const
+{
+    return last_tensor_prepare_ms_;
 }
 
 double Detector::last_backend_call_ms() const

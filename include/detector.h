@@ -73,7 +73,13 @@ public:
 
     double last_inference_ms() const;
 
+    double last_image_clone_ms() const;
+
     double last_preprocess_ms() const;
+
+    double last_resize_ms() const;
+    double last_padding_ms() const;
+    double last_tensor_prepare_ms() const;
 
     double last_backend_call_ms() const;
 
@@ -138,6 +144,10 @@ private:
         backend_;
 
     // 最近一次检测的阶段耗时，单位为毫秒。
+    double last_image_clone_ms_ = 0.0;
+    double last_resize_ms_ = 0.0;
+    double last_padding_ms_ = 0.0;
+    double last_tensor_prepare_ms_ = 0.0;
     double last_preprocess_ms_ = 0.0;
     double last_backend_call_ms_ = 0.0;
     double last_postprocess_ms_ = 0.0;

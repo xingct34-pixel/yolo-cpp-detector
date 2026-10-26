@@ -140,8 +140,20 @@ void Pipeline::inferenceLoop()
             detector_.last_inference_ms());
 
         // Detector 各阶段的独立耗时。
+        image_clone_benchmark_.record(
+            detector_.last_image_clone_ms());
+
         preprocess_benchmark_.record(
             detector_.last_preprocess_ms());
+
+        resize_benchmark_.record(
+            detector_.last_resize_ms());
+
+        padding_benchmark_.record(
+            detector_.last_padding_ms());
+
+        tensor_prepare_benchmark_.record(
+            detector_.last_tensor_prepare_ms());
 
         backend_call_benchmark_.record(
             detector_.last_backend_call_ms());
@@ -375,7 +387,11 @@ void Pipeline::run()
             << "==============================\n";
     };
 
+    print_stage("Image clone", image_clone_benchmark_);
     print_stage("Preprocess", preprocess_benchmark_);
+    print_stage("Resize", resize_benchmark_);
+    print_stage("Padding", padding_benchmark_);
+    print_stage("Tensor preparation", tensor_prepare_benchmark_);
     print_stage("Backend API call", backend_call_benchmark_);
     print_stage("Postprocess", postprocess_benchmark_);
 }

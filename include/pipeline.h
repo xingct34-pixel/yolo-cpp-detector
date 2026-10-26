@@ -110,7 +110,11 @@ private:
 
     // 模型运行时和各阶段的独立统计。
     Benchmark benchmark_;
+    Benchmark image_clone_benchmark_;
     Benchmark preprocess_benchmark_;
+    Benchmark resize_benchmark_;
+    Benchmark padding_benchmark_;
+    Benchmark tensor_prepare_benchmark_;
     Benchmark backend_call_benchmark_;
     Benchmark postprocess_benchmark_;
 };
