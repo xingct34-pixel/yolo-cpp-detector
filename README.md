@@ -179,7 +179,7 @@ cmake --build . -j
 yolo_detector
 ```
 
-以上是预期构建流程，仍需结合实际环境解决编译问题并完成验证。
+该构建流程已在当前测试环境中通过 Release 清洁构建。其他环境需将 ONNXRUNTIME_ROOT 替换为本机安装路径；TensorRT 开启配置尚未验证。
 
 ## 七、运行项目
 
