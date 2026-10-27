@@ -282,3 +282,72 @@ endif()
 
 message(STATUS "========================================")
 message(STATUS "")
+
+
+# ============================================================
+# 自动化测试
+# ============================================================
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(
+        thread_safe_queue_test
+        tests/test_thread_safe_queue.cpp
+    )
+
+    target_include_directories(
+        thread_safe_queue_test
+        PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+    )
+
+    add_test(
+        NAME thread_safe_queue_test
+        COMMAND thread_safe_queue_test
+    )
+
+    set_tests_properties(
+        thread_safe_queue_test
+        PROPERTIES TIMEOUT 5
+    )
+
+    get_filename_component(
+        ONNXRUNTIME_LIBRARY_DIR
+        "${ONNXRUNTIME_LIBRARY}"
+        DIRECTORY
+    )
+
+    function(add_invalid_queue_size_test test_name queue_value)
+        add_test(
+            NAME "${test_name}"
+            COMMAND "${CMAKE_COMMAND}"
+                "-DYOLO_EXECUTABLE=$<TARGET_FILE:yolo_detector>"
+                "-DORT_LIBRARY_DIR=${ONNXRUNTIME_LIBRARY_DIR}"
+                "-DQUEUE_VALUE=${queue_value}"
+                "-P"
+                "${PROJECT_SOURCE_DIR}/tests/test_invalid_queue_size.cmake"
+        )
+        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 25)
+    endfunction()
+
+    add_invalid_queue_size_test(cli_reject_queue_zero "0")
+    add_invalid_queue_size_test(cli_reject_queue_text "abc")
+    add_invalid_queue_size_test(cli_reject_queue_suffix "3junk")
+    add_invalid_queue_size_test(cli_reject_queue_negative "-1")
+
+    add_test(
+        NAME cli_reject_missing_video
+        COMMAND "${CMAKE_COMMAND}"
+            "-DYOLO_EXECUTABLE=$<TARGET_FILE:yolo_detector>"
+            "-DORT_LIBRARY_DIR=${ONNXRUNTIME_LIBRARY_DIR}"
+            "-DPROJECT_ROOT=${PROJECT_SOURCE_DIR}"
+            "-P"
+            "${PROJECT_SOURCE_DIR}/tests/test_invalid_video.cmake"
+    )
+
+    set_tests_properties(
+        cli_reject_missing_video
+        PROPERTIES TIMEOUT 20
+    )
+endif()

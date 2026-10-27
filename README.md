@@ -161,7 +161,7 @@ cd build
 
 ```bash
 cmake .. \
-  -DONNXRUNTIME_ROOT=/你的/onnxruntime/实际路径 \
+  -DONNXRUNTIME_ROOT=/home/xct/onnxruntime-linux-x64-gpu-1.21.1 \
   -DENABLE_TENSORRT=OFF
 ```
 
@@ -221,7 +221,7 @@ CUDA 推理需要支持 CUDA Execution Provider（CUDA 执行提供器）的 ONN
 
 ```bash
 cmake .. \
-  -DONNXRUNTIME_ROOT=/你的/onnxruntime/实际路径 \
+  -DONNXRUNTIME_ROOT=/home/xct/onnxruntime-linux-x64-gpu-1.21.1 \
   -DTENSORRT_ROOT=/你的/tensorrt/实际路径 \
   -DENABLE_TENSORRT=ON
 ```
@@ -296,3 +296,17 @@ INT8 校准需要具有代表性的图片数据集。生成的 Engine 还需要�
 8. 学习延迟、吞吐量和性能测试方法。
 
 项目功能以实际编译、运行和测试结果为准，不以文档中的功能描述代替验证。
+
+## 十一、自动化测试
+
+项目使用 CTest 运行自动化测试。在项目根目录执行：
+
+```bash
+cmake -S . -B build_check -DONNXRUNTIME_ROOT=/home/xct/onnxruntime-linux-x64-gpu-1.21.1 -DENABLE_TENSORRT=OFF
+cmake --build build_check -j2
+ctest --test-dir build_check --output-on-failure
+```
+
+当前测试覆盖：线程安全队列行为、非法队列容量参数和无效视频路径。
+无效视频测试需要本地 ONNX 模型文件和 data/coco.txt。
+本机 ONNX Runtime 路径为 /home/xct/onnxruntime-linux-x64-gpu-1.21.1；其他环境请替换为自己的安装目录。
