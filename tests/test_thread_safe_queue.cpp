@@ -66,5 +66,15 @@ int main()
     assert(!drain_queue.pop(item));
     std::cout << "[通过] 关闭队列可排空已有数据\n";
 
+
+    ThreadSafeQueue<int> blocking(1,QueuePolicy::Block);
+    assert(blocking.push(1));std::atomic<bool> started{false},accepted{true};
+    std::thread producer([&]{started=true;accepted=blocking.push(2);});
+    while(!started)std::this_thread::yield();
+    blocking.close();producer.join();assert(!accepted);assert(blocking.pop(item)&&item==1);
+    assert(blocking.dropped()==0&&blocking.peak()==1);
+    ThreadSafeQueue<int> transfer(2,QueuePolicy::Block);
+    std::thread writer([&]{for(int k=0;k<1000;++k)assert(transfer.push(k));transfer.close();});
+    int expected=0;while(transfer.pop(item))assert(item==expected++);writer.join();assert(expected==1000);
     return 0;
 }

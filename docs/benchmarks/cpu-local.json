@@ -1,0 +1,577 @@
+{
+  "verification": {
+    "binary_sha256": "2309ba1701976160d5c2485ea495d3bbd4d4e4ff96863db5dde2d693ca7fc5dd",
+    "model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+    "video_sha256": "cc0fe2b882e2b7f8395af794b3ad532731df6c36cc6d6b3253cf9db92e18f7eb",
+    "cases": [
+      {
+        "schema_version": 1,
+        "mode": "sequential",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 0.0,
+        "result_queue_peak": 0.0,
+        "elapsed_seconds": 10.453108286,
+        "output_fps": 2.8699597458661588,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 305.61985896666664,
+          "p50_ms": 298.90743,
+          "p95_ms": 393.12542014999997
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 27.350542566666675,
+          "p50_ms": 26.4106515,
+          "p95_ms": 40.62655554999999
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 307.4863623333333,
+          "p50_ms": 299.74483,
+          "p95_ms": 395.5856056
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 2.3669401333333338,
+          "p50_ms": 1.7365499999999998,
+          "p95_ms": 6.448014999999985
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 0.0,
+          "p50_ms": 0.0,
+          "p95_ms": 0.0
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 339.9127054333334,
+          "p50_ms": 328.236133,
+          "p95_ms": 436.22490369999997
+        }
+      },
+      {
+        "schema_version": 1,
+        "mode": "pipeline",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 2.0,
+        "result_queue_peak": 1.0,
+        "elapsed_seconds": 13.656847092,
+        "output_fps": 2.1967002923810726,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 397.92180906666664,
+          "p50_ms": 367.22112849999996,
+          "p95_ms": 648.7075542499994
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 37.545742266666664,
+          "p50_ms": 34.01496,
+          "p95_ms": 64.70195899999999
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 399.48082946666665,
+          "p50_ms": 367.81252900000004,
+          "p95_ms": 649.6660247999994
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 2.5320339,
+          "p50_ms": 2.1318,
+          "p95_ms": 5.539336999999997
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 1260.2983665333334,
+          "p50_ms": 1221.2806175,
+          "p95_ms": 2014.3098393
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 1714.785632966666,
+          "p50_ms": 1673.9619335,
+          "p95_ms": 2699.5763352499985
+        }
+      },
+      {
+        "schema_version": 1,
+        "mode": "pipeline",
+        "queue_policy": "drop-oldest",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 150.0,
+        "inferred_frames": 3.0,
+        "output_frames": 3.0,
+        "input_dropped": 147.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 1.0,
+        "result_queue_peak": 1.0,
+        "elapsed_seconds": 2.086276374,
+        "output_fps": 1.4379686399113676,
+        "inference": {
+          "samples": 3.0,
+          "mean_ms": 542.263771,
+          "p50_ms": 615.898181,
+          "p95_ms": 633.2698028
+        },
+        "preprocess": {
+          "samples": 3.0,
+          "mean_ms": 79.90137700000001,
+          "p50_ms": 92.648012,
+          "p95_ms": 113.2810547
+        },
+        "backend_api": {
+          "samples": 3.0,
+          "mean_ms": 547.0463383333333,
+          "p50_ms": 628.041883,
+          "p95_ms": 635.7528130000001
+        },
+        "postprocess": {
+          "samples": 3.0,
+          "mean_ms": 1.5311003333333335,
+          "p50_ms": 1.349901,
+          "p95_ms": 1.9149200999999998
+        },
+        "queue_wait": {
+          "samples": 3.0,
+          "mean_ms": 63.57934166666667,
+          "p50_ms": 6.863501,
+          "p95_ms": 165.9454517
+        },
+        "end_to_end": {
+          "samples": 3.0,
+          "mean_ms": 714.815927,
+          "p50_ms": 751.437799,
+          "p95_ms": 783.2312026
+        }
+      },
+      {
+        "schema_version": 1,
+        "mode": "image",
+        "detections": [],
+        "inference_ms": 556.171136
+      }
+    ],
+    "sigint_exit_code": 0
+  },
+  "comparison": {
+    "binary_sha256": "2309ba1701976160d5c2485ea495d3bbd4d4e4ff96863db5dde2d693ca7fc5dd",
+    "frames_per_run": 30,
+    "warmup": 2,
+    "queue_capacity": 2,
+    "threads": 3,
+    "runs": [
+      {
+        "schema_version": 1,
+        "mode": "sequential",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 0.0,
+        "result_queue_peak": 0.0,
+        "elapsed_seconds": 8.578586469,
+        "output_fps": 3.4970796305905956,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 250.6923977333334,
+          "p50_ms": 242.8520375,
+          "p95_ms": 338.84131425
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 20.64705216666666,
+          "p50_ms": 19.330599,
+          "p95_ms": 35.18023299999998
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 252.28018089999992,
+          "p50_ms": 243.6685375,
+          "p95_ms": 339.80872379999994
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 2.0112732,
+          "p50_ms": 1.5428000000000002,
+          "p95_ms": 4.107449999999999
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 0.0,
+          "p50_ms": 0.0,
+          "p95_ms": 0.0
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 277.3964561333333,
+          "p50_ms": 272.267879,
+          "p95_ms": 362.49837734999994
+        },
+        "repeat": 0,
+        "peak_rss_kib_sampled": 234008
+      },
+      {
+        "schema_version": 1,
+        "mode": "pipeline",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 2.0,
+        "result_queue_peak": 1.0,
+        "elapsed_seconds": 11.411354966000001,
+        "output_fps": 2.628960372312022,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 331.7879966333333,
+          "p50_ms": 305.946214,
+          "p95_ms": 490.0408632
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 37.15262666666668,
+          "p50_ms": 26.555146999999998,
+          "p95_ms": 68.37434754999998
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 333.87227633333333,
+          "p50_ms": 307.1432635,
+          "p95_ms": 490.77081775
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 1.7617532333333332,
+          "p50_ms": 1.4220995,
+          "p95_ms": 3.2909549999999985
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 1031.0191734333332,
+          "p50_ms": 961.0280865,
+          "p95_ms": 1474.939626
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 1410.2297890666662,
+          "p50_ms": 1277.4350490000002,
+          "p95_ms": 1987.70072505
+        },
+        "repeat": 0,
+        "peak_rss_kib_sampled": 255628
+      },
+      {
+        "schema_version": 1,
+        "mode": "pipeline",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 2.0,
+        "result_queue_peak": 1.0,
+        "elapsed_seconds": 8.987123648,
+        "output_fps": 3.3381091854317835,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 263.21967520000004,
+          "p50_ms": 262.213351,
+          "p95_ms": 345.7017409999999
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 25.241316466666667,
+          "p50_ms": 22.73215,
+          "p95_ms": 45.7525139
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 264.90599853333333,
+          "p50_ms": 263.835601,
+          "p95_ms": 346.6449259999999
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 2.47038,
+          "p50_ms": 1.66265,
+          "p95_ms": 6.998419999999989
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 816.4765315000001,
+          "p50_ms": 862.9627975000001,
+          "p95_ms": 1003.2727135499999
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 1114.1796564999997,
+          "p50_ms": 1155.2130364999998,
+          "p95_ms": 1318.62354955
+        },
+        "repeat": 1,
+        "peak_rss_kib_sampled": 264660
+      },
+      {
+        "schema_version": 1,
+        "mode": "sequential",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 0.0,
+        "result_queue_peak": 0.0,
+        "elapsed_seconds": 11.036215632,
+        "output_fps": 2.7183231100535643,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 321.78058270000014,
+          "p50_ms": 316.3300625,
+          "p95_ms": 427.1015568999999
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 25.7902543,
+          "p50_ms": 24.383601499999997,
+          "p95_ms": 37.042040349999986
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 324.0500127333333,
+          "p50_ms": 317.13721250000003,
+          "p95_ms": 429.40843189999987
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 2.240506733333333,
+          "p50_ms": 1.55835,
+          "p95_ms": 6.726479999999997
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 0.0,
+          "p50_ms": 0.0,
+          "p95_ms": 0.0
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 354.7871438666667,
+          "p50_ms": 347.475364,
+          "p95_ms": 469.10041109999986
+        },
+        "repeat": 1,
+        "peak_rss_kib_sampled": 233560
+      },
+      {
+        "schema_version": 1,
+        "mode": "sequential",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 0.0,
+        "result_queue_peak": 0.0,
+        "elapsed_seconds": 11.546147603,
+        "output_fps": 2.5982692263699447,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 340.1787030666667,
+          "p50_ms": 337.278102,
+          "p95_ms": 445.2890172
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 29.280586833333334,
+          "p50_ms": 25.3126495,
+          "p95_ms": 46.23811599999999
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 342.0877697666666,
+          "p50_ms": 338.138552,
+          "p95_ms": 446.00567720000004
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 3.2977733999999996,
+          "p50_ms": 1.7177,
+          "p95_ms": 10.480829999999994
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 0.0,
+          "p50_ms": 0.0,
+          "p95_ms": 0.0
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 377.1639333999999,
+          "p50_ms": 366.8412525,
+          "p95_ms": 491.49723935
+        },
+        "repeat": 2,
+        "peak_rss_kib_sampled": 234404
+      },
+      {
+        "schema_version": 1,
+        "mode": "pipeline",
+        "queue_policy": "block",
+        "backend": "ONNX Runtime",
+        "show": 0,
+        "warmup": 2,
+        "stopped": 0,
+        "read_frames": 30.0,
+        "inferred_frames": 30.0,
+        "output_frames": 30.0,
+        "input_dropped": 0.0,
+        "result_dropped": 0.0,
+        "input_queue_peak": 2.0,
+        "result_queue_peak": 1.0,
+        "elapsed_seconds": 12.314558499999999,
+        "output_fps": 2.436140930265588,
+        "inference": {
+          "samples": 30.0,
+          "mean_ms": 301.7472766666667,
+          "p50_ms": 225.5413,
+          "p95_ms": 519.9462894499999
+        },
+        "preprocess": {
+          "samples": 30.0,
+          "mean_ms": 69.67469663333333,
+          "p50_ms": 23.69935,
+          "p95_ms": 114.35378499999976
+        },
+        "backend_api": {
+          "samples": 30.0,
+          "mean_ms": 304.05002666666667,
+          "p50_ms": 226.67635,
+          "p95_ms": 526.3636044499999
+        },
+        "postprocess": {
+          "samples": 30.0,
+          "mean_ms": 2.4186333333333336,
+          "p50_ms": 1.7071,
+          "p95_ms": 3.499424999999999
+        },
+        "queue_wait": {
+          "samples": 30.0,
+          "mean_ms": 1114.1803866333332,
+          "p50_ms": 726.9628995,
+          "p95_ms": 3656.604998
+        },
+        "end_to_end": {
+          "samples": 30.0,
+          "mean_ms": 1551.5640932666668,
+          "p50_ms": 968.1908490000001,
+          "p95_ms": 4244.246963
+        },
+        "repeat": 2,
+        "peak_rss_kib_sampled": 255008
+      }
+    ]
+  },
+  "full_video": {
+    "schema_version": 1,
+    "mode": "pipeline",
+    "queue_policy": "block",
+    "backend": "ONNX Runtime",
+    "show": 0,
+    "warmup": 5,
+    "stopped": 0,
+    "read_frames": 150.0,
+    "inferred_frames": 150.0,
+    "output_frames": 150.0,
+    "input_dropped": 0.0,
+    "result_dropped": 0.0,
+    "input_queue_peak": 3.0,
+    "result_queue_peak": 1.0,
+    "elapsed_seconds": 51.138687041,
+    "output_fps": 2.9332000620144747,
+    "inference": {
+      "samples": 150.0,
+      "mean_ms": 299.9675849333334,
+      "p50_ms": 293.7942945,
+      "p95_ms": 427.71644789999993
+    },
+    "preprocess": {
+      "samples": 150.0,
+      "mean_ms": 30.842003486666655,
+      "p50_ms": 25.1682,
+      "p95_ms": 62.43605299999996
+    },
+    "backend_api": {
+      "samples": 150.0,
+      "mean_ms": 302.06577092666663,
+      "p50_ms": 295.3734985,
+      "p95_ms": 428.4848478999999
+    },
+    "postprocess": {
+      "samples": 150.0,
+      "mean_ms": 2.658319946666667,
+      "p50_ms": 1.6296499999999998,
+      "p95_ms": 10.52311999999999
+    },
+    "queue_wait": {
+      "samples": 150.0,
+      "mean_ms": 1320.0001824666665,
+      "p50_ms": 1372.1440315,
+      "p95_ms": 1795.9204984499997
+    },
+    "end_to_end": {
+      "samples": 150.0,
+      "mean_ms": 1660.67818208,
+      "p50_ms": 1722.135624,
+      "p95_ms": 2215.810886
+    }
+  }
+}

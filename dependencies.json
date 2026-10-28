@@ -1,0 +1,19 @@
+{
+  "onnxruntime": {
+    "version": "1.21.1",
+    "upstream": "https://github.com/microsoft/onnxruntime",
+    "sdk": "existing Linux x64 GPU SDK used with CPU provider",
+    "local_library_sha256": "cb4f0f7d7ca96f02e23f407c5b5e137cac5ddaa5a4ea759c064c09c39c008eaf",
+    "official_archive_hash_verified": false
+  },
+  "opencv": {
+    "version": "4.6.0",
+    "upstream": "https://github.com/opencv/opencv"
+  },
+  "model": {
+    "name": "existing YOLO11n ONNX",
+    "bytes": 10741398,
+    "sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+    "download_and_export_provenance_verified": false
+  }
+}

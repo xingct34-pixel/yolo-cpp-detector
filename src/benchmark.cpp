@@ -14,28 +14,16 @@ void Benchmark::record(
         return;
     }
 
-    latencies_.push_back(
-        latency_ms);
+    if(total_count_==0)minimum_=maximum_=latency_ms;
+    minimum_=std::min(minimum_,latency_ms);maximum_=std::max(maximum_,latency_ms);
+    sum_+=latency_ms;++total_count_;
+    if(latencies_.size()<10000)latencies_.push_back(latency_ms);
+    else latencies_[next_++%10000]=latency_ms;
 }
 
 double Benchmark::average() const
 {
-    if (latencies_.empty())
-    {
-        return 0.0;
-    }
-
-    double sum = 0.0;
-
-    for (double latency :
-         latencies_)
-    {
-        sum += latency;
-    }
-
-    return sum /
-           static_cast<double>(
-               latencies_.size());
+    return total_count_?sum_/total_count_:0;
 }
 
 double Benchmark::percentile(
@@ -97,31 +85,17 @@ double Benchmark::p95() const
 
 double Benchmark::min() const
 {
-    if (latencies_.empty())
-    {
-        return 0.0;
-    }
-
-    return *std::min_element(
-        latencies_.begin(),
-        latencies_.end());
+    return minimum_;
 }
 
 double Benchmark::max() const
 {
-    if (latencies_.empty())
-    {
-        return 0.0;
-    }
-
-    return *std::max_element(
-        latencies_.begin(),
-        latencies_.end());
+    return maximum_;
 }
 
 size_t Benchmark::count() const
 {
-    return latencies_.size();
+    return total_count_;
 }
 
 void Benchmark::print(

@@ -59,3 +59,20 @@ Thumbs.db
 *.temp
 
 build_check/
+
+# Local validation and assets (preserved on disk)
+/results/
+/build-local*/
+*.mp4
+*.avi
+*.pt
+*.tgz
+*.tar.gz
+*.before-*
+/yolo_gpu
+__pycache__/
+*.pyc
+.env
+.env.*
+*.pem
+*.key

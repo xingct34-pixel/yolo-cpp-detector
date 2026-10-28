@@ -42,4 +42,6 @@ private:
 
 private:
     std::vector<double> latencies_;
+    size_t total_count_=0, next_=0;
+    double sum_=0, minimum_=0, maximum_=0;
 };

@@ -41,7 +41,10 @@ set(TENSORRT_ROOT
 
 find_package(OpenCV REQUIRED)
 
-find_package(CUDAToolkit REQUIRED)
+find_package(Threads REQUIRED)
+if(ENABLE_TENSORRT)
+    find_package(CUDAToolkit REQUIRED)
+endif()
 
 
 # ============================================================
@@ -52,7 +55,7 @@ if(NOT ONNXRUNTIME_ROOT)
     message(FATAL_ERROR
         "ONNXRUNTIME_ROOT is not set.\n"
         "Example:\n"
-        "cmake .. -DONNXRUNTIME_ROOT=/home/xct/onnxruntime-linux-x64-gpu-1.18.0")
+        "cmake .. -DONNXRUNTIME_ROOT=/path/to/onnxruntime")
 endif()
 
 find_path(
@@ -87,6 +90,7 @@ set(APP_SOURCES
     src/ort_backend.cpp
 
     src/benchmark.cpp
+    src/yolo_processing.cpp
 )
 
 
@@ -154,7 +158,7 @@ target_link_libraries(
 
     ${ONNXRUNTIME_LIBRARY}
 
-    CUDA::cudart
+    Threads::Threads
 )
 
 
@@ -176,6 +180,7 @@ if(ENABLE_TENSORRT)
         PRIVATE
 
         ${TENSORRT_LIBRARY}
+        CUDA::cudart
     )
 
     target_compile_definitions(
@@ -350,4 +355,33 @@ if(BUILD_TESTING)
         cli_reject_missing_video
         PROPERTIES TIMEOUT 20
     )
+endif()
+
+if(BUILD_TESTING)
+    add_executable(yolo_processing_test tests/test_processing.cpp src/yolo_processing.cpp)
+    target_include_directories(yolo_processing_test PRIVATE include ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(yolo_processing_test PRIVATE ${OpenCV_LIBS})
+    add_test(NAME yolo_processing_test COMMAND yolo_processing_test)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME cli_validation COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:yolo_detector>)
+    set_tests_properties(cli_validation PROPERTIES TIMEOUT 20)
+endif()
+option(ENABLE_SANITIZERS "Enable application ASan and UBSan" OFF)
+if(ENABLE_SANITIZERS)
+    foreach(target yolo_detector thread_safe_queue_test yolo_processing_test)
+        if(TARGET ${target})
+            target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+            target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endforeach()
+endif()
+
+if(BUILD_TESTING)
+    add_executable(benchmark_test tests/test_benchmark.cpp src/benchmark.cpp)
+    target_include_directories(benchmark_test PRIVATE include)
+    add_test(NAME benchmark_test COMMAND benchmark_test)
+    if(ENABLE_SANITIZERS)
+        target_compile_options(benchmark_test PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(benchmark_test PRIVATE -fsanitize=address,undefined)
+    endif()
 endif()

@@ -520,6 +520,5 @@ TensorRT 可以针对 NVIDIA GPU 做多种优化，例如：
 TensorRT 不保证在所有模型、所有 GPU 和所有配置下都比 ONNX Runtime 快。
 实际速度取决于模型结构、GPU 型号、精度配置、输入尺寸、算子支持情况、内存拷贝、批次大小和运行时设置等因素。
 ONNX Runtime 本身也可以使用不同的 Execution Provider（执行提供程序），例如 CUDA Execution Provider。因此，比较时不能简单理解成“ONNX Runtime 只能用 CPU，而 TensorRT 才能用 GPU”。
-*/
 在同一个 Stream 上排在推理前面、尚未完成的 H2D 搬运
 */

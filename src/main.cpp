@@ -1,306 +1,53 @@
 #include "pipeline.h"
-
+#include <opencv2/imgcodecs.hpp>
+#include <csignal>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
-#include <string>
-
-// ==================== 命令行配置模块 ====================
-//cpp文件里面可以加using namespace std；，后面就不用加std：：了，，.h的头文件不能加，以防出现冲突
-
-struct AppConfig
-{
-    std::string video_path =
-        "test.mp4";
-
-    std::string model_path =
-        "models/yolo11n.onnx";
-
-    std::string classes_path =
-        "data/coco.txt";
-
-    std::string engine_path =
-        "models/yolo11n.engine";
-
-    Detector::BackendType backend =
-        Detector::BackendType::ORT;
-
-    bool use_cuda = false;
-
-    size_t queue_size = 3;
-};
-
-// ==================== 帮助信息模块 ====================
-
-void printHelp()
-{
-    std::cout
-        << "\nYOLO C++ Inference Deployment\n\n"
-
-        << "Usage:\n"
-        << "  ./yolo_detector [options]\n\n"
-
-        << "Options:\n"
-
-        << "  --backend ort|trt\n"
-        << "      选择推理后端\n\n"
-
-        << "  --ort-device cpu|cuda\n"
-        << "      ORT 使用 CPU 或 CUDA\n\n"
-
-        << "  --video <path>\n"
-        << "      视频文件路径\n\n"
-
-        << "  --model <path>\n"
-        << "      ONNX 模型路径\n\n"
-
-        << "  --engine <path>\n"
-        << "      TensorRT Engine 路径\n\n"
-
-        << "  --classes <path>\n"
-        << "      类别文件路径\n\n"
-
-        << "  --queue-size <N>\n"
-        << "      Pipeline 队列大小\n\n"
-
-        << "  --help\n"
-        << "      显示帮助\n\n";
+namespace {
+std::atomic<bool> interrupted{false};
+static_assert(std::atomic<bool>::is_always_lock_free,"signal flag must be lock free");
+void stop(int){interrupted.store(true,std::memory_order_relaxed);}
+int integer(const std::string& text,const std::string& key,int low,int high){
+    if(text.empty()||text.find_first_not_of("0123456789")!=std::string::npos)throw std::invalid_argument(key+" must be an integer");
+    unsigned long long n=0;try{n=std::stoull(text);}catch(...){throw std::invalid_argument(key+" out of range");}
+    if(n<static_cast<unsigned>(low)||n>static_cast<unsigned>(high))throw std::invalid_argument(key+" out of range");return int(n);
 }
-
-/*==================== 参数解析模块 ====================
-parseArgs 从 i = 1 开始遍历，因为 argv[0] 是程序名。
-遇到 --video、--model 这类选项，就用 argv[++i] 取下一个字符串作为值，再用 continue 进入下一轮。
-如果 i + 1 >= argc，说明选项后面没有值，直接抛异常。
---queue-size 用 std::stoul 转成数字，并检查必须大于 0。
-不认识的参数会抛出"未知参数"。
---help 会打印帮助并 std::exit(0)。
-parse解析  args参数
-*/
-
-AppConfig parseArgs(
-    int argc,    //参数个数
-    char* argv[])            //参数字符串数组
-{
-    AppConfig config;
-
-    for (int i = 1;
-         i < argc;
-         ++i)
-    {
-        const std::string arg =
-            argv[i];
-
-        if (arg == "--help")
-        {
-            printHelp();
-
-            std::exit(0);
-        }
-
-        if (arg == "--backend")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--backend 缺少参数。");
-            }
-
-            const std::string value =
-                argv[++i];
-
-            if (value == "ort")
-            {
-                config.backend =
-                    Detector::BackendType::ORT;
-            }
-            else if (value == "trt")
-            {
-                config.backend =
-                    Detector::BackendType::TensorRT;
-            }
-            else
-            {
-                throw std::runtime_error(
-                    "backend 必须是 ort 或 trt。");
-            }
-
-            continue;
-        }
-
-        if (arg == "--ort-device")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--ort-device 缺少参数。");
-            }
-
-            const std::string value =
-                argv[++i];
-
-            if (value == "cpu")
-            {
-                config.use_cuda = false;
-            }
-            else if (value == "cuda")
-            {
-                config.use_cuda = true;
-            }
-            else
-            {
-                throw std::runtime_error(
-                    "ort-device 必须是 cpu 或 cuda。");
-            }
-
-            continue;
-        }
-
-        if (arg == "--video")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--video 缺少参数。");
-            }
-
-            config.video_path =
-                argv[++i];
-
-            continue;
-        }
-
-        if (arg == "--model")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--model 缺少参数。");
-            }
-
-            config.model_path =
-                argv[++i];
-
-            continue;
-        }
-
-        if (arg == "--engine")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--engine 缺少参数。");
-            }
-
-            config.engine_path =
-                argv[++i];
-
-            continue;
-        }
-
-        if (arg == "--classes")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--classes 缺少参数。");
-            }
-
-            config.classes_path =
-                argv[++i];
-
-            continue;
-        }
-
-        if (arg == "--queue-size")
-        {
-            if (i + 1 >= argc)
-            {
-                throw std::runtime_error(
-                    "--queue-size 缺少参数。");
-            }
-
-            const std::string value =
-                argv[++i];
-
-            if (value.empty() ||
-                value.find_first_not_of("0123456789") !=
-                    std::string::npos)
-            {
-                throw std::runtime_error(
-                    "queue-size 必须是大于 0 的十进制整数。");
-            }
-
-            std::size_t parsed_chars = 0;
-            const unsigned long long parsed =
-                std::stoull(value, &parsed_chars);
-
-            if (parsed_chars != value.size() ||
-                parsed == 0 ||
-                parsed > std::numeric_limits<std::size_t>::max())
-            {
-                throw std::runtime_error(
-                    "queue-size 超出允许范围或不是有效正整数。");
-            }
-
-            config.queue_size =
-                static_cast<std::size_t>(parsed);
-
-            continue;
-        }
-
-        throw std::runtime_error(
-            "未知参数: " + arg);
-    }
-
-    //ort=ONNX RUNtime       trt=Tensor RUNtime
-    // TensorRT 不使用 ORT CUDA 配置
-    if (config.backend ==
-        Detector::BackendType::TensorRT)
-    {
-        config.use_cuda = false;
-    }
-
-    return config;
 }
-
-// ==================== 主函数模块 ====================
-//程序从这里开始
-int main(
-    int argc,
-    char* argv[])
-{
-    try
-    {
-        AppConfig config =
-            parseArgs(
-                argc,
-                argv);
-
-        std::cout
-            << "==============================\n"
-            << "YOLO C++ Inference Deployment\n"
-            << "==============================\n";
-
-        Pipeline pipeline(              //创建pipeline
-            config.video_path,
-            config.model_path,
-            config.classes_path,
-            config.backend,
-            config.engine_path,
-            config.use_cuda,
-            config.queue_size);
-
-        pipeline.run();         //启动
+int main(int argc,char** argv){try{
+    std::string video="test.mp4",image,output,model="models/yolo11n.onnx",classes="data/coco.txt",engine="models/yolo11n.engine";
+    auto type=Detector::BackendType::ORT;bool cuda=false;int capacity=3;PipelineOptions options;
+    for(int i=1;i<argc;++i){std::string key=argv[i];
+        if(key=="--help"){std::cout<<"YOLO C++ CPU inference\n--image PATH --output PATH | --video PATH\n--model PATH --classes PATH\n"
+            <<"--backend ort|trt --ort-device cpu|cuda --engine PATH\n--mode pipeline|sequential --queue-policy block|drop-oldest\n"
+            <<"--queue-size 1..64 --max-frames 0..1000000 --warmup 0..100 --report PATH --show --headless\n";return 0;}
+        if(key=="--show"){options.show=true;continue;}if(key=="--headless"){options.show=false;continue;}
+        if(i+1>=argc)throw std::invalid_argument(key+" missing value");std::string value=argv[++i];
+        if(key=="--video")video=value;else if(key=="--image")image=value;else if(key=="--output")output=value;
+        else if(key=="--model")model=value;else if(key=="--classes")classes=value;else if(key=="--engine")engine=value;
+        else if(key=="--report")options.report=value;
+        else if(key=="--queue-size")capacity=integer(value,key,1,64);
+        else if(key=="--max-frames")options.max_frames=integer(value,key,0,1000000);
+        else if(key=="--warmup")options.warmup=integer(value,key,0,100);
+        else if(key=="--backend"){if(value=="ort")type=Detector::BackendType::ORT;else if(value=="trt")type=Detector::BackendType::TensorRT;else throw std::invalid_argument("invalid backend");}
+        else if(key=="--ort-device"){if(value=="cpu")cuda=false;else if(value=="cuda")cuda=true;else throw std::invalid_argument("invalid ort-device");}
+        else if(key=="--mode"){if(value=="pipeline")options.sequential=false;else if(value=="sequential")options.sequential=true;else throw std::invalid_argument("invalid mode");}
+        else if(key=="--queue-policy"){if(value=="block")options.policy=QueuePolicy::Block;else if(value=="drop-oldest")options.policy=QueuePolicy::DropOldest;else throw std::invalid_argument("invalid queue-policy");}
+        else throw std::invalid_argument("unknown argument: "+key);
     }
-    catch (const std::exception& e)
-    {
-        std::cerr
-            << "\n程序异常："
-            << e.what()
-            << std::endl;
-
-        return 1;
-    }
-
+    std::signal(SIGINT,stop);std::signal(SIGTERM,stop);options.external_stop=&interrupted;
+    if(!image.empty()){
+        if(output.empty())throw std::invalid_argument("--image requires --output");
+        auto input=cv::imread(image);if(input.empty())throw std::runtime_error("cannot read image: "+image);
+        Detector detector(model,classes,type,engine,cuda);auto result=detector.detect(input);
+        if(!cv::imwrite(output,result))throw std::runtime_error("cannot write image: "+output);
+        if(!options.report.empty()){
+            cv::FileStorage fs(options.report,cv::FileStorage::WRITE|cv::FileStorage::FORMAT_JSON);
+            if(!fs.isOpened())throw std::runtime_error("cannot write report");
+            fs<<"schema_version"<<1<<"mode"<<"image"<<"detections"<<"[";
+            for(const auto& d:detector.detections())fs<<"{"<<"class_id"<<d.class_id<<"score"<<d.score<<"x"<<d.box.x<<"y"<<d.box.y<<"width"<<d.box.width<<"height"<<d.box.height<<"}";
+            fs<<"]"<<"inference_ms"<<detector.last_inference_ms();
+        }
+    }else{Pipeline pipeline(video,model,classes,type,engine,cuda,capacity,options);pipeline.run();}
     return 0;
-}
+}catch(const std::exception& e){std::cerr<<"程序异常："<<e.what()<<'\n';return 1;}}

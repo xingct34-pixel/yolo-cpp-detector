@@ -106,6 +106,15 @@ OrtBackend::OrtBackend(
     input_shape_ =
         input_tensor_info.GetShape();
 
+    if(session_.GetInputCount()!=1 || session_.GetOutputCount()!=1 ||
+       input_tensor_info.GetElementType()!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
+       input_shape_!=std::vector<int64_t>({1,3,640,640}))
+        throw std::runtime_error("expected one float32 input [1,3,640,640] and one output");
+    auto out_type=session_.GetOutputTypeInfo(0);
+    auto out_info=out_type.GetTensorTypeAndShapeInfo();
+    if(out_info.GetElementType()!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
+       out_info.GetShape()!=std::vector<int64_t>({1,84,8400}))
+        throw std::runtime_error("expected float32 output [1,84,8400]");
     std::cout
         << "ONNX Runtime 输入 Tensor: "
         << input_name_
@@ -133,6 +142,7 @@ std::vector<float> OrtBackend::infer(
     // 当前使用 CPU 内存作为输入，
     // CUDA Execution Provider 会负责后续的数据传输。
 
+    if(input_data.size()!=3u*640*640)throw std::invalid_argument("invalid YOLO input size");
     Ort::MemoryInfo memory_info =
         Ort::MemoryInfo::CreateCpu(
             OrtArenaAllocator,
