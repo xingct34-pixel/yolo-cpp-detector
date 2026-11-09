@@ -1,0 +1,12 @@
+# Optional, project-local Python 3.12 CPU experiment environment.
+numpy==1.26.4
+onnx==1.17.0
+onnxruntime==1.21.1
+opencv-python-headless==4.10.0.84
+coloredlogs==15.0.1
+flatbuffers==25.12.19
+humanfriendly==10.0
+mpmath==1.3.0
+packaging==26.3
+protobuf==7.36.2
+sympy==1.14.0

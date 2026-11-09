@@ -18,13 +18,20 @@ std::vector<float> prepare_yolo(const cv::Mat& image,LetterboxInfo& info,Preproc
     const int h=std::clamp(int(std::round(image.rows*info.scale)),1,640);
     info.scale_x=float(w)/image.cols;info.scale_y=float(h)/image.rows;
     info.pad_x=(640-w)/2;info.pad_y=(640-h)/2;
-    auto begin=Clock::now();cv::Mat resized,padded,blob;
+    auto begin=Clock::now();cv::Mat resized,padded;
     cv::resize(image,resized,{w,h});auto resized_at=Clock::now();
     cv::copyMakeBorder(resized,padded,info.pad_y,640-h-info.pad_y,
         info.pad_x,640-w-info.pad_x,cv::BORDER_CONSTANT,{114,114,114});
     auto padded_at=Clock::now();
+    // Write NCHW pixels directly into the returned vector. This avoids a second
+    // 4.69 MiB tensor buffer and the subsequent full-tensor copy on each frame.
+    std::vector<float> data(3u * 640 * 640);
+    const int shape[] = {1, 3, 640, 640};
+    cv::Mat blob(4, shape, CV_32F, data.data());
     cv::dnn::blobFromImage(padded,blob,1./255.,{}, {},true,false,CV_32F);
-    std::vector<float> data(blob.ptr<float>(),blob.ptr<float>()+blob.total());
+    if (blob.ptr<float>() != data.data()) {
+        throw std::runtime_error("OpenCV replaced the external tensor buffer");
+    }
     times={ms(begin,resized_at),ms(resized_at,padded_at),ms(padded_at,Clock::now())};return data;
 }
 std::vector<Detection> decode_yolo(const std::vector<float>& output,cv::Size size,

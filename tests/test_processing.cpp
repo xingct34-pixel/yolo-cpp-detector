@@ -6,7 +6,27 @@
 #include <cmath>
 #include <limits>
 #include <iostream>
+#include <algorithm>
+#include <opencv2/dnn.hpp>
+#include <opencv2/imgproc.hpp>
 int main(){
+    // Regression: external-buffer packing must match the former blob + copy
+    // path for nonuniform pixels, portrait/landscape and rounding boundaries.
+    for (const auto size : {cv::Size(1000,333), cv::Size(333,1000), cv::Size(640,640), cv::Size(17,31)}) {
+        cv::Mat image(size,CV_8UC3);
+        cv::randu(image,0,256);
+        LetterboxInfo geometry; PreprocessTimes measured;
+        auto packed=prepare_yolo(image,geometry,measured);
+        const int width=std::clamp(int(std::round(image.cols*geometry.scale)),1,640);
+        const int height=std::clamp(int(std::round(image.rows*geometry.scale)),1,640);
+        cv::Mat resized,padded;
+        cv::resize(image,resized,{width,height});
+        cv::copyMakeBorder(resized,padded,geometry.pad_y,640-height-geometry.pad_y,
+            geometry.pad_x,640-width-geometry.pad_x,cv::BORDER_CONSTANT,{114,114,114});
+        auto reference=cv::dnn::blobFromImage(padded,1./255.,{}, {},true,false,CV_32F);
+        assert(packed.size()==reference.total());
+        for(size_t i=0;i<packed.size();++i) assert(packed[i]==reference.ptr<float>()[i]);
+    }
     LetterboxInfo info;PreprocessTimes times;
     auto tensor=prepare_yolo(cv::Mat(333,1000,CV_8UC3,cv::Scalar(0,0,255)),info,times);
     assert(tensor.size()==3u*640*640);assert(info.pad_y==213);assert(info.scale_y!=info.scale_x);

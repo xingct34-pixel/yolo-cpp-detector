@@ -1,0 +1,577 @@
+{
+  "date": "2026-11-09",
+  "quantization": {
+    "passed": true,
+    "backend": "CPU",
+    "accuracy_map": null,
+    "accuracy_note": "Unlabelled adjacent video frames; numerical smoke test only.",
+    "versions": {
+      "numpy": "1.26.4",
+      "onnx": "1.17.0",
+      "onnxruntime": "1.21.1",
+      "opencv-python-headless": "4.10.0.84"
+    },
+    "threads": 3,
+    "repeats": 3,
+    "calibration_frame_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "evaluation_frame_ids": [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "source_model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+    "video_sha256": "cc0fe2b882e2b7f8395af794b3ad532731df6c36cc6d6b3253cf9db92e18f7eb",
+    "calibration_tensor_sha256": [
+      "cf6cef92fae94031c0c5148fdbc3fa683a4236a9f27c329c177f9038893b09d2",
+      "b2ff8de34e36d95a69c2e560e042813bacbbfad2fdcf8be44185073ef7de08bb",
+      "211b31a30a9a0deeebcc66112988b3ecaa2382d202f185ee768815bd9d15762f",
+      "4fa0bec6c5e26e0b6d0b6efaab783820c08499aafd4a65b27e586a9a9d74ea83",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657"
+    ],
+    "evaluation_tensor_sha256": [
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "8a76235c6b1d15b044bd34469c7cd3cb0ec724b7ccc85d8e5f1ffd71c80d9657",
+      "66806add1946d8a3862be546a085e8ee0ed5e25f1de5bb387dd98f84395937a1",
+      "7c36ae60112c805f539b288168d13faaab4a3877f138caf78509e66f72d9a51c",
+      "35d2edb9df3819b817454a54aea8ef0926cf878c87155d1810aba69a869c8d8f",
+      "35d2edb9df3819b817454a54aea8ef0926cf878c87155d1810aba69a869c8d8f"
+    ],
+    "unique_calibration_tensors": 5,
+    "unique_evaluation_tensors": 4,
+    "calibration_evaluation_content_overlap": 1,
+    "data_warning": "Distinct frame indices contain duplicate tensors; not an independent accuracy set.",
+    "quantized_sha256": "a8a2685c9d5bbdf8afa762fbfee5b537637cf491b64ae8922f090b7450e25f12",
+    "model_bytes": {
+      "fp32": 10741398,
+      "int8": 3190029
+    },
+    "quantized_node_counts": {
+      "QuantizeLinear": 174,
+      "DequantizeLinear": 349,
+      "Conv": 88,
+      "Sigmoid": 78,
+      "Mul": 79,
+      "Split": 10,
+      "Add": 16,
+      "Concat": 21,
+      "MaxPool": 3,
+      "Reshape": 11,
+      "Transpose": 3,
+      "MatMul": 2,
+      "Softmax": 2,
+      "Resize": 2,
+      "Slice": 2,
+      "Sub": 2,
+      "Div": 1
+    },
+    "timing_scope": "Python ORT Session.run, no preprocessing or queue wait; 2 warmups per model",
+    "latency_ms": {
+      "fp32": {
+        "samples": [
+          67.92702399997097,
+          61.4182290000258,
+          72.5628560000473,
+          69.83463299997084,
+          61.09562499995036,
+          64.59022399997139,
+          63.38963899997907,
+          65.05377899998166,
+          62.37998399996059,
+          63.76137199998766,
+          65.03087100003313,
+          70.40496499996607,
+          70.83983800004034,
+          67.72852000000285,
+          61.71981800002868,
+          64.34855399999151,
+          71.51779999998098,
+          64.81097300002148,
+          60.51383800001986,
+          84.56577600003357,
+          67.04308000001902,
+          71.98391099996115,
+          65.4741689999696,
+          65.15677000004416
+        ],
+        "median": 65.10527450001291
+      },
+      "int8": {
+        "samples": [
+          94.9748880000243,
+          100.48207500000217,
+          105.83458599995765,
+          97.40464599997267,
+          98.25933999997005,
+          96.99750900000481,
+          98.92793099999153,
+          98.34084300001678,
+          93.32106499999782,
+          93.6227510000549,
+          100.56461900001068,
+          107.21256599998696,
+          105.34613600003695,
+          111.68936799998619,
+          101.60683700001982,
+          100.16344599995364,
+          107.26481900002227,
+          99.53735899995309,
+          102.56300800000417,
+          140.18298999997114,
+          103.38570600004005,
+          105.05864999998948,
+          98.37151400000721,
+          98.29351299998734
+        ],
+        "median": 100.3227604999779
+      }
+    },
+    "numerical_difference": [
+      {
+        "raw_mae": 0.2705226568664401,
+        "raw_rmse": 3.542899566205832,
+        "score_mae": 0.000008257013656908558
+      },
+      {
+        "raw_mae": 0.2705226568664401,
+        "raw_rmse": 3.542899566205832,
+        "score_mae": 0.000008257013656908558
+      },
+      {
+        "raw_mae": 0.2705226568664401,
+        "raw_rmse": 3.542899566205832,
+        "score_mae": 0.000008257013656908558
+      },
+      {
+        "raw_mae": 0.2705226568664401,
+        "raw_rmse": 3.542899566205832,
+        "score_mae": 0.000008257013656908558
+      },
+      {
+        "raw_mae": 0.2724570108457656,
+        "raw_rmse": 3.6182019032712387,
+        "score_mae": 0.00000984371178561733
+      },
+      {
+        "raw_mae": 0.2716145037199516,
+        "raw_rmse": 3.6179944253403677,
+        "score_mae": 0.000009224176805998599
+      },
+      {
+        "raw_mae": 0.27232527528612827,
+        "raw_rmse": 3.605301752603563,
+        "score_mae": 0.00000936829675698564
+      },
+      {
+        "raw_mae": 0.27232527528612827,
+        "raw_rmse": 3.605301752603563,
+        "score_mae": 0.00000936829675698564
+      }
+    ]
+  },
+  "native_resources": {
+    "passed": true,
+    "threads": 3,
+    "frames": 16,
+    "sampling_interval_ms": 20,
+    "runs": [
+      {
+        "case": "before",
+        "repeat": 0,
+        "binary_sha256": "2309ba1701976160d5c2485ea495d3bbd4d4e4ff96863db5dde2d693ca7fc5dd",
+        "model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+        "peak_rss_kib_sampled": 232812,
+        "peak_swap_kib_sampled": 0,
+        "process_wall_seconds": 6.3941199490000145,
+        "pipeline_report": {
+          "schema_version": 1,
+          "mode": "sequential",
+          "queue_policy": "block",
+          "backend": "ONNX Runtime",
+          "show": 0,
+          "warmup": 2,
+          "stopped": 0,
+          "read_frames": 16,
+          "inferred_frames": 16,
+          "output_frames": 16,
+          "input_dropped": 0,
+          "result_dropped": 0,
+          "input_queue_peak": 0,
+          "result_queue_peak": 0,
+          "elapsed_seconds": 1.56880746,
+          "output_fps": 10.198829625657186,
+          "inference": {
+            "samples": 16,
+            "mean_ms": 79.1441746875,
+            "p50_ms": 73.09722049999999,
+            "p95_ms": 110.41914
+          },
+          "preprocess": {
+            "samples": 16,
+            "mean_ms": 10.539935375,
+            "p50_ms": 7.3432975,
+            "p95_ms": 22.19786775
+          },
+          "backend_api": {
+            "samples": 16,
+            "mean_ms": 79.68120831250002,
+            "p50_ms": 73.4987775,
+            "p95_ms": 110.83220349999999
+          },
+          "postprocess": {
+            "samples": 16,
+            "mean_ms": 1.04316975,
+            "p50_ms": 0.9467755,
+            "p95_ms": 1.5542599999999998
+          },
+          "queue_wait": {
+            "samples": 16,
+            "mean_ms": 0,
+            "p50_ms": 0,
+            "p95_ms": 0
+          },
+          "end_to_end": {
+            "samples": 16,
+            "mean_ms": 92.27316125,
+            "p50_ms": 84.98272,
+            "p95_ms": 132.58059874999998
+          }
+        }
+      },
+      {
+        "case": "after",
+        "repeat": 0,
+        "binary_sha256": "179fd901b8cecd63cef8b771aba020f2115fd4a8b251d19c6fe55ffa7eabebec",
+        "model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+        "peak_rss_kib_sampled": 233180,
+        "peak_swap_kib_sampled": 0,
+        "process_wall_seconds": 1.4945402869999498,
+        "pipeline_report": {
+          "schema_version": 1,
+          "mode": "sequential",
+          "queue_policy": "block",
+          "backend": "ONNX Runtime",
+          "show": 0,
+          "warmup": 2,
+          "stopped": 0,
+          "read_frames": 16,
+          "inferred_frames": 16,
+          "output_frames": 16,
+          "input_dropped": 0,
+          "result_dropped": 0,
+          "input_queue_peak": 0,
+          "result_queue_peak": 0,
+          "elapsed_seconds": 1.146611437,
+          "output_fps": 13.954160479911558,
+          "inference": {
+            "samples": 16,
+            "mean_ms": 60.35106112499999,
+            "p50_ms": 59.4246905,
+            "p95_ms": 64.81655625
+          },
+          "preprocess": {
+            "samples": 16,
+            "mean_ms": 6.0517411875,
+            "p50_ms": 5.829903,
+            "p95_ms": 7.469350499999999
+          },
+          "backend_api": {
+            "samples": 16,
+            "mean_ms": 60.68620906250001,
+            "p50_ms": 59.9407475,
+            "p95_ms": 65.1557875
+          },
+          "postprocess": {
+            "samples": 16,
+            "mean_ms": 0.8188265000000001,
+            "p50_ms": 0.807186,
+            "p95_ms": 0.90333275
+          },
+          "queue_wait": {
+            "samples": 16,
+            "mean_ms": 0,
+            "p50_ms": 0,
+            "p95_ms": 0
+          },
+          "end_to_end": {
+            "samples": 16,
+            "mean_ms": 68.30972675,
+            "p50_ms": 67.2616415,
+            "p95_ms": 73.56752350000001
+          }
+        }
+      },
+      {
+        "case": "int8",
+        "repeat": 0,
+        "binary_sha256": "179fd901b8cecd63cef8b771aba020f2115fd4a8b251d19c6fe55ffa7eabebec",
+        "model_sha256": "a8a2685c9d5bbdf8afa762fbfee5b537637cf491b64ae8922f090b7450e25f12",
+        "peak_rss_kib_sampled": 237464,
+        "peak_swap_kib_sampled": 0,
+        "process_wall_seconds": 2.3551543570000604,
+        "pipeline_report": {
+          "schema_version": 1,
+          "mode": "sequential",
+          "queue_policy": "block",
+          "backend": "ONNX Runtime",
+          "show": 0,
+          "warmup": 2,
+          "stopped": 0,
+          "read_frames": 16,
+          "inferred_frames": 16,
+          "output_frames": 16,
+          "input_dropped": 0,
+          "result_dropped": 0,
+          "input_queue_peak": 0,
+          "result_queue_peak": 0,
+          "elapsed_seconds": 1.768284917,
+          "output_fps": 9.048315600149408,
+          "inference": {
+            "samples": 16,
+            "mean_ms": 98.40205925,
+            "p50_ms": 97.28912600000001,
+            "p95_ms": 107.99510624999999
+          },
+          "preprocess": {
+            "samples": 16,
+            "mean_ms": 6.854196937500001,
+            "p50_ms": 6.1471275,
+            "p95_ms": 9.163639
+          },
+          "backend_api": {
+            "samples": 16,
+            "mean_ms": 98.80443531249999,
+            "p50_ms": 97.704972,
+            "p95_ms": 108.23119750000001
+          },
+          "postprocess": {
+            "samples": 16,
+            "mean_ms": 0.905860375,
+            "p50_ms": 0.8293105000000001,
+            "p95_ms": 1.26357975
+          },
+          "queue_wait": {
+            "samples": 16,
+            "mean_ms": 0,
+            "p50_ms": 0,
+            "p95_ms": 0
+          },
+          "end_to_end": {
+            "samples": 16,
+            "mean_ms": 107.56732549999998,
+            "p50_ms": 105.4707025,
+            "p95_ms": 120.0890765
+          }
+        }
+      },
+      {
+        "case": "int8",
+        "repeat": 1,
+        "binary_sha256": "179fd901b8cecd63cef8b771aba020f2115fd4a8b251d19c6fe55ffa7eabebec",
+        "model_sha256": "a8a2685c9d5bbdf8afa762fbfee5b537637cf491b64ae8922f090b7450e25f12",
+        "peak_rss_kib_sampled": 237496,
+        "peak_swap_kib_sampled": 0,
+        "process_wall_seconds": 2.311533295000004,
+        "pipeline_report": {
+          "schema_version": 1,
+          "mode": "sequential",
+          "queue_policy": "block",
+          "backend": "ONNX Runtime",
+          "show": 0,
+          "warmup": 2,
+          "stopped": 0,
+          "read_frames": 16,
+          "inferred_frames": 16,
+          "output_frames": 16,
+          "input_dropped": 0,
+          "result_dropped": 0,
+          "input_queue_peak": 0,
+          "result_queue_peak": 0,
+          "elapsed_seconds": 1.747955993,
+          "output_fps": 9.153548524147542,
+          "inference": {
+            "samples": 16,
+            "mean_ms": 96.69799956249999,
+            "p50_ms": 95.877793,
+            "p95_ms": 105.4019055
+          },
+          "preprocess": {
+            "samples": 16,
+            "mean_ms": 7.355822312499999,
+            "p50_ms": 5.992799,
+            "p95_ms": 11.050564
+          },
+          "backend_api": {
+            "samples": 16,
+            "mean_ms": 97.05037162499997,
+            "p50_ms": 96.221529,
+            "p95_ms": 105.83963274999999
+          },
+          "postprocess": {
+            "samples": 16,
+            "mean_ms": 1.0158405,
+            "p50_ms": 0.7948744999999999,
+            "p95_ms": 1.672412
+          },
+          "queue_wait": {
+            "samples": 16,
+            "mean_ms": 0,
+            "p50_ms": 0,
+            "p95_ms": 0
+          },
+          "end_to_end": {
+            "samples": 16,
+            "mean_ms": 106.40885449999999,
+            "p50_ms": 105.3653,
+            "p95_ms": 116.58812375000001
+          }
+        }
+      },
+      {
+        "case": "after",
+        "repeat": 1,
+        "binary_sha256": "179fd901b8cecd63cef8b771aba020f2115fd4a8b251d19c6fe55ffa7eabebec",
+        "model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+        "peak_rss_kib_sampled": 233188,
+        "peak_swap_kib_sampled": 0,
+        "process_wall_seconds": 1.4740770649999604,
+        "pipeline_report": {
+          "schema_version": 1,
+          "mode": "sequential",
+          "queue_policy": "block",
+          "backend": "ONNX Runtime",
+          "show": 0,
+          "warmup": 2,
+          "stopped": 0,
+          "read_frames": 16,
+          "inferred_frames": 16,
+          "output_frames": 16,
+          "input_dropped": 0,
+          "result_dropped": 0,
+          "input_queue_peak": 0,
+          "result_queue_peak": 0,
+          "elapsed_seconds": 1.126031312,
+          "output_fps": 14.20919634249034,
+          "inference": {
+            "samples": 16,
+            "mean_ms": 60.0052693125,
+            "p50_ms": 59.8904635,
+            "p95_ms": 63.085993
+          },
+          "preprocess": {
+            "samples": 16,
+            "mean_ms": 5.907463999999999,
+            "p50_ms": 5.5464850000000006,
+            "p95_ms": 7.10764275
+          },
+          "backend_api": {
+            "samples": 16,
+            "mean_ms": 60.4035325,
+            "p50_ms": 60.250547499999996,
+            "p95_ms": 63.4242035
+          },
+          "postprocess": {
+            "samples": 16,
+            "mean_ms": 0.8987152500000001,
+            "p50_ms": 0.8541785,
+            "p95_ms": 1.06821775
+          },
+          "queue_wait": {
+            "samples": 16,
+            "mean_ms": 0,
+            "p50_ms": 0,
+            "p95_ms": 0
+          },
+          "end_to_end": {
+            "samples": 16,
+            "mean_ms": 67.97211256249999,
+            "p50_ms": 67.553136,
+            "p95_ms": 71.6007965
+          }
+        }
+      },
+      {
+        "case": "before",
+        "repeat": 1,
+        "binary_sha256": "2309ba1701976160d5c2485ea495d3bbd4d4e4ff96863db5dde2d693ca7fc5dd",
+        "model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+        "peak_rss_kib_sampled": 233428,
+        "peak_swap_kib_sampled": 0,
+        "process_wall_seconds": 1.5604302479999888,
+        "pipeline_report": {
+          "schema_version": 1,
+          "mode": "sequential",
+          "queue_policy": "block",
+          "backend": "ONNX Runtime",
+          "show": 0,
+          "warmup": 2,
+          "stopped": 0,
+          "read_frames": 16,
+          "inferred_frames": 16,
+          "output_frames": 16,
+          "input_dropped": 0,
+          "result_dropped": 0,
+          "input_queue_peak": 0,
+          "result_queue_peak": 0,
+          "elapsed_seconds": 1.207756568,
+          "output_fps": 13.247702744018529,
+          "inference": {
+            "samples": 16,
+            "mean_ms": 63.306725875,
+            "p50_ms": 62.696253999999996,
+            "p95_ms": 66.79136
+          },
+          "preprocess": {
+            "samples": 16,
+            "mean_ms": 7.8035165,
+            "p50_ms": 7.436768000000001,
+            "p95_ms": 9.93420675
+          },
+          "backend_api": {
+            "samples": 16,
+            "mean_ms": 63.77323093750001,
+            "p50_ms": 63.3756555,
+            "p95_ms": 67.26918950000001
+          },
+          "postprocess": {
+            "samples": 16,
+            "mean_ms": 0.919030875,
+            "p50_ms": 0.8448625000000001,
+            "p95_ms": 1.12495425
+          },
+          "queue_wait": {
+            "samples": 16,
+            "mean_ms": 0,
+            "p50_ms": 0,
+            "p95_ms": 0
+          },
+          "end_to_end": {
+            "samples": 16,
+            "mean_ms": 73.28178662500001,
+            "p50_ms": 72.2983705,
+            "p95_ms": 77.9553105
+          }
+        }
+      }
+    ],
+    "note": "RSS includes process/model/runtime. Host load and page cache are not isolated."
+  }
+}

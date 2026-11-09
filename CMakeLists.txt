@@ -295,6 +295,13 @@ message(STATUS "")
 
 include(CTest)
 
+set(YOLO_QUANT_PYTHON "" CACHE FILEPATH "Optional Python interpreter with requirements-quantization.txt")
+if(BUILD_TESTING AND YOLO_QUANT_PYTHON)
+    add_test(NAME quantization_preprocessing
+        COMMAND "${YOLO_QUANT_PYTHON}" "${PROJECT_SOURCE_DIR}/tests/test_quantization.py")
+    set_tests_properties(quantization_preprocessing PROPERTIES TIMEOUT 30)
+endif()
+
 if(BUILD_TESTING)
     add_executable(
         thread_safe_queue_test
