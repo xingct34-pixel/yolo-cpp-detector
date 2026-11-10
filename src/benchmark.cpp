@@ -14,6 +14,7 @@ void Benchmark::record(
         return;
     }
 
+    // 均值/极值统计全程；分位数只保留最近10000个样本，避免长视频无限增加统计内存。
     if(total_count_==0)minimum_=maximum_=latency_ms;
     minimum_=std::min(minimum_,latency_ms);maximum_=std::max(maximum_,latency_ms);
     sum_+=latency_ms;++total_count_;
@@ -47,6 +48,7 @@ double Benchmark::percentile(
         values.begin(),
         values.end());
 
+    // 排序后按p*(n-1)定位，相邻样本之间线性插值；P95描述延迟尾部，不是平均值。
     const double index =
         p *
         static_cast<double>(
@@ -162,6 +164,7 @@ void Benchmark::print(
         << " ms"
         << std::endl;
 
+    // 此处只是所记录阶段平均耗时的倒数，不等于读帧、排队、绘制都计入的Pipeline FPS。
     if (average() > 0.0)
     {
         std::cout
@@ -179,7 +182,7 @@ void Benchmark::print(
 
 一句话：平均值只描述"中心"，不描述"分布"，而用户感受到的是最慢的那些帧。
 
-平均值会被离群值拉偏或掩盖。 100 次推理里 95 次 10ms、5 次 200ms，平均 = 19.5ms，对应约 51 FPS，看起来很流畅。但 P95 已经接近 200ms，每 20 帧就卡一次。
+平均值会掩盖尾部波动。例如100次推理里90次10ms、10次200ms，平均为29ms，对应约34.5 FPS，但按下方插值公式计算的P95为200ms，说明仍有明显慢帧。
 你的 Model FPS = 1000 / average 只是"平均延迟的倒数"，不是任何一帧的真实表现。
 首次推理的冷启动会污染平均值和 max，所以要先 warmup。
 FPS 是吞吐视角，延迟是体验视角。 实时场景（视频流、自动驾驶、在线服务）关心的是每一帧能否在截止时间内完成，必须看分布。

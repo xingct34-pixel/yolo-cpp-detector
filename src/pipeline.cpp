@@ -9,10 +9,14 @@ double ms(Clock::time_point a,Clock::time_point b){return std::chrono::duration<
 void stats(cv::FileStorage& fs,const char* name,const Benchmark& b){
     fs<<name<<"{"<<"samples"<<double(b.count())<<"mean_ms"<<b.average()<<"p50_ms"<<b.p50()<<"p95_ms"<<b.p95()<<"}";}
 }
+// 数据流：读取线程 -> frame_queue_ -> 单推理线程 -> result_queue_ -> 主线程消费。
+// detector_在Pipeline构造时加载一次；容量限制待处理帧数，不会提高最慢阶段的处理速度。
 Pipeline::Pipeline(const std::string& video,const std::string& model,const std::string& classes,
     Detector::BackendType type,const std::string& engine,bool cuda,size_t capacity,PipelineOptions options):
     frame_queue_(capacity,options.policy),result_queue_(capacity,options.policy),
     detector_(model,classes,type,engine,cuda),video_path_(video),options_(std::move(options)){}
+// 异常/取消走快速停止：先记住首个异常、关闭并唤醒两个队列，再由run()汇合线程。
+// 与正常EOF逐级排空不同，此路径不保证处理完所有已读帧。
 void Pipeline::requestStop(std::exception_ptr error){
     if(error){std::lock_guard<std::mutex> lock(error_mutex_);if(!error_)error_=error;}
     stop_requested_=true;frame_queue_.close();result_queue_.close();
@@ -21,9 +25,11 @@ void Pipeline::readLoop(){
     cv::VideoCapture cap(video_path_);if(!cap.isOpened())throw std::runtime_error("视频打开失败："+video_path_);
     cv::Mat image;int id=0;
     while(!stop_requested_ && (!options_.max_frames||id<options_.max_frames) && cap.read(image)){
+        // VideoCapture会复用image缓冲，clone使入队帧拥有独立像素；move只转交对象，不替代深拷贝。
         FrameData data{id++,image.clone(),Clock::now()};++read_count_;
         if(!frame_queue_.push(std::move(data)))break;
     }
+    // 正常读完只关闭输入队列：拒绝新帧，但推理线程仍可取走队列里的剩余帧。
     frame_queue_.close();
 }
 void Pipeline::collect(){
@@ -32,20 +38,24 @@ void Pipeline::collect(){
 }
 void Pipeline::inferenceLoop(){
     FrameData data;
+    // pop返回前已释放队列锁，耗时detect在锁外执行，读取线程可继续入队。
     while(!stop_requested_&&frame_queue_.pop(data)){
         queue_wait_.record(ms(data.captured,Clock::now()));
         auto image=detector_.detect(data.frame);++inference_count_;collect();
         if(!result_queue_.push({data.frame_id,std::move(image),data.captured}))break;
     }
+    // 输入排空后关闭结果队列，让主线程消费完最后的结果并退出。
     result_queue_.close();
 }
 void Pipeline::consume(ResultData& result){
     if(options_.show){cv::imshow("YOLO Result",result.frame);if(cv::waitKey(1)==27)requestStop();}
+    // 端到端计时从解码并clone完成后的captured开始，含排队、推理及消费，不含此前读取。
     ++display_count_;end_to_end_.record(ms(result.captured,Clock::now()));
 }
 void Pipeline::display(){ResultData result;while(!stop_requested_&&result_queue_.pop(result))consume(result);}
 void Pipeline::run(){
     if(options_.warmup<0||options_.max_frames<0)throw std::invalid_argument("invalid pipeline limits");
+    // 预热复用同一模型，但不record到阶段统计，也不计入下面的整体运行时间。
     for(int i=0;i<options_.warmup;++i)(void)detector_.detect(cv::Mat(640,640,CV_8UC3,cv::Scalar{}));
     auto begin=Clock::now();std::thread reader,infer,monitor;std::atomic<bool> finished{false};
     try {
@@ -65,9 +75,11 @@ void Pipeline::run(){
             display();
         }
     }catch(...){requestStop(std::current_exception());}
+    // join只等待线程结束，不会主动停止线程；异常时前面必须先关闭队列解除等待。
     if(reader.joinable())reader.join();if(infer.joinable())infer.join();finished=true;
     if(monitor.joinable())monitor.join();if(options_.show)cv::destroyAllWindows();
     if(error_)std::rethrow_exception(error_);
+    // 实际输出FPS=输出帧数/整段运行秒数；与1000/平均Run毫秒数的计时范围不同。
     double seconds=ms(begin,Clock::now())/1000.;
     std::cout<<"读取帧数："<<read_count_<<"\n推理帧数："<<inference_count_<<"\n输出帧数："<<display_count_
         <<"\nPipeline FPS："<<(seconds>0?display_count_/seconds:0)<<"\n丢弃输入/结果帧："<<frame_queue_.dropped()<<"/"<<result_queue_.dropped()<<'\n';

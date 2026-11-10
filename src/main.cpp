@@ -14,6 +14,7 @@ int integer(const std::string& text,const std::string& key,int low,int high){
     if(n<static_cast<unsigned>(low)||n>static_cast<unsigned>(high))throw std::invalid_argument(key+" out of range");return int(n);
 }
 }
+// 入口只负责参数校验、选择图片/视频路径及统一异常出口；检测算法留给Detector。
 int main(int argc,char** argv){try{
     std::string video="test.mp4",image,output,model="models/yolo11n.onnx",classes="data/coco.txt",engine="models/yolo11n.engine";
     auto type=Detector::BackendType::ORT;bool cuda=false;int capacity=3;PipelineOptions options;
@@ -35,6 +36,7 @@ int main(int argc,char** argv){try{
         else if(key=="--queue-policy"){if(value=="block")options.policy=QueuePolicy::Block;else if(value=="drop-oldest")options.policy=QueuePolicy::DropOldest;else throw std::invalid_argument("invalid queue-policy");}
         else throw std::invalid_argument("unknown argument: "+key);
     }
+    // 信号回调只置原子标志；视频Pipeline的监视线程再正常关闭队列，回调中不做复杂清理。
     std::signal(SIGINT,stop);std::signal(SIGTERM,stop);options.external_stop=&interrupted;
     if(!image.empty()){
         if(output.empty())throw std::invalid_argument("--image requires --output");

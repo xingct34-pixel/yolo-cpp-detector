@@ -13,7 +13,7 @@ OrtBackend::makeSessionOptions(
 {
     Ort::SessionOptions options;
 
-    // 控制 CPU 线程数量
+    // 单个算子内部默认使用3个CPU线程，可由环境变量覆盖；与视频Pipeline的角色线程数不同。
     int intra_op_threads = 3;
 
     if (const char* env_value =
@@ -90,6 +90,7 @@ OrtBackend::OrtBackend(
             0,
             allocator);
 
+    // 保存到std::string中：allocator管理的临时名称退出作用域后，成员名称仍有效。
     input_name_ =
         input_name.get();
 
@@ -106,6 +107,8 @@ OrtBackend::OrtBackend(
     input_shape_ =
         input_tensor_info.GetShape();
 
+    // 本适配层只接固定float32输入[1,3,640,640]、输出[1,84,8400]。
+    // 动态尺寸、不同类别数或带NMS的导出模型需要另行适配，不能只改一个8400常量。
     if(session_.GetInputCount()!=1 || session_.GetOutputCount()!=1 ||
        input_tensor_info.GetElementType()!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
        input_shape_!=std::vector<int64_t>({1,3,640,640}))
@@ -148,6 +151,8 @@ std::vector<float> OrtBackend::infer(
             OrtArenaAllocator,
             OrtMemTypeDefault);
 
+    // 包装现成vector的内存，不复制输入；同步Run结束前input_data必须保持有效且不能扩容。
+    // input_data.size()是float元素个数，不是字节数；shape说明这些元素怎样分组。
     Ort::Value input_tensor =
         Ort::Value::CreateTensor<float>(
             memory_info,
@@ -173,6 +178,8 @@ std::vector<float> OrtBackend::infer(
     // Session（执行环境）
     // Run（开始生产）
 
+    // 只计同步Run调用：不含输入张量包装、后面的输出复制及Detector预后处理。
+    // CUDA路径还可能含EP管理的数据传输，这不是单独GPU kernel耗时，也未在本机验收。
     auto start =
         std::chrono::steady_clock::now();
 
@@ -226,6 +233,7 @@ std::vector<float> OrtBackend::infer(
     const size_t output_count =
         output_info.GetElementCount();
 
+    // 输出指针属于outputs中的Ort::Value；复制到自己的vector，函数返回后数据才仍有效。
     return std::vector<float>(
         output_data,
         output_data + output_count);
@@ -258,23 +266,23 @@ session_(env_, model_path.c_str(), makeSessionOptions(use_cuda)) 在构造时就
 加载动作全在构造函数里，每帧不会重新加载。
 
 4. Input Tensor 怎么创建
-在 infer() 里用 CreateCpu 描述内存位置，再用 CreateTensor<float> 包装 input_data 的内存，不拷贝。const_cast 是因为 ORT 的 API 要求非 const 指针，它不会修改数据。Run() 结束前 input_data 必须有效，这一点在你的代码里成立。
+在 infer() 里用 CreateCpu 描述内存位置，再用 CreateTensor<float> 包装 input_data 的内存，不拷贝。const_cast 用于适配此 API 的非 const 指针签名，此处只作为模型输入使用，不能把去掉 const 理解成任何写入都安全。同步 Run() 结束前 input_data 必须有效且地址不变。
 
 5. input_shape_ 从哪里来
-来自构造函数里的 GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape()。YOLO 通常是 [1,3,640,640]。如果模型导出时用了动态维度，这里会得到 -1，CreateTensor 会出错，需要额外处理。
+来自构造函数里的 GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape()。本项目明确检查 [1,3,640,640]；若是动态维度 -1 或其他形状，会在构造阶段拒绝加载，尚不支持动态输入。
 
 6. session.Run() 做了什么
 按名字绑定输入输出，在所选 Execution Provider 上按拓扑顺序执行各算子，返回 std::vector<Ort::Value>。
 
 7. 输出为什么能通过 float* 读取
-输出 Tensor 是连续内存，GetTensorMutableData<float>() 返回首地址，GetElementCount() 给出元素个数。前提是模型输出是 float32，如果换成 FP16 模型这里就会读错。
+输出 Tensor 是连续内存，GetTensorMutableData<float>() 返回首地址，GetElementCount() 给出元素个数。本项目在构造时检查输出为 float32；直接换成 FP16 输出模型会被拒绝，不会继续按 float32 解析。
 
 8. CPU 和 CUDA Execution Provider 的区别
 use_cuda 为 true 时，AppendExecutionProvider_CUDA 让算子在 GPU 上跑。输入仍是 CPU 内存，ORT 内部自动做主机到设备的拷贝，输出也会拷回 CPU，所以 float* 才能直接读。如果 CUDA 环境或 onnxruntime-gpu 包不可用，这个调用会抛异常。另外 CUDA 首次运行有预热开销，统计延迟时建议跳过前几帧。
 
-9. SetIntraOpNumThreads(1) 是干什么的
-限制单个算子内部的并行线程数为 1。延迟更稳定，也不抢其他线程的 CPU，代价是纯 CPU 模式下单次推理更慢。启用 CUDA 后，被分配到 CPU 的少量算子也只用 1 个线程。
+9. SetIntraOpNumThreads(intra_op_threads) 是干什么的
+控制算子内部的 CPU 并行度，本项目默认 3，可用 YOLO_ORT_INTRA_OP_THREADS 设置 1~64。线程不是越多越快，需在同一负载下实测；启用 CUDA 时也不代表所有算子一定由 GPU 执行。
 
 10. 推理耗时从哪里开始计时，到哪里结束
-计时只包住 session_.Run(...)，起点在 Run 之前，终点在 Run 返回之后。它不包含 Tensor 创建，也不包含最后的输出拷贝，所以 last_latency_ms() 反映的是纯推理耗时，不是整个 infer() 的耗时。
+计时只包住同步 session_.Run(...)，不包含 Tensor 创建和最后的输出复制，所以 last_latency_ms() 是 Run API 延迟，不是整个 infer() 或整帧延迟；CUDA EP 路径还可能含传输开销，不能当作纯 GPU kernel 时间。
 */

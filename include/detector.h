@@ -20,6 +20,8 @@ public:
     std::string backend_name() const{return backend_->name();}
 private:
     std::vector<std::string> names_;
+    // 独占后端所有权；通过统一虚接口调用ORT/TRT，Detector销毁时自动释放后端资源。
+    // detect()会更新检测记录和计时，当前Pipeline仅让一个推理线程使用此对象。
     std::unique_ptr<InferenceBackend> backend_;
     std::vector<Detection> detections_;
     PreprocessTimes times_;
