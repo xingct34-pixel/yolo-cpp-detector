@@ -6,177 +6,115 @@
 #include <iostream>
 #include <stdexcept>
 
-void Benchmark::record(
-    double latency_ms)
-{
-    if (latency_ms < 0.0 || !std::isfinite(latency_ms))
-    {
+// 模块：样本记录：累计全程指标并维护有界分位样本
+void Benchmark::record(double latency_ms) {
+    if (latency_ms < 0.0 || !std::isfinite(latency_ms)) {
         return;
     }
 
     // 均值/极值统计全程；分位数只保留最近10000个样本，避免长视频无限增加统计内存。
-    if(total_count_==0)minimum_=maximum_=latency_ms;
-    minimum_=std::min(minimum_,latency_ms);maximum_=std::max(maximum_,latency_ms);
-    sum_+=latency_ms;++total_count_;
-    if(latencies_.size()<10000)latencies_.push_back(latency_ms);
-    else latencies_[next_++%10000]=latency_ms;
+    if (total_count_ == 0)
+        minimum_ = maximum_ = latency_ms;
+    minimum_ = std::min(minimum_, latency_ms);
+    maximum_ = std::max(maximum_, latency_ms);
+    sum_ += latency_ms;
+    ++total_count_;
+    if (latencies_.size() < 10000)
+        latencies_.push_back(latency_ms);
+    else
+        latencies_[next_++ % 10000] = latency_ms;
 }
 
-double Benchmark::average() const
-{
-    return total_count_?sum_/total_count_:0;
+// 模块：统计计算：提供均值、插值分位、极值和样本数量
+double Benchmark::average() const {
+    return total_count_ ? sum_ / total_count_ : 0;
 }
 
-double Benchmark::percentile(
-    double p) const
-{
-    if (latencies_.empty())
-    {
+double Benchmark::percentile(double p) const {
+    if (latencies_.empty()) {
         return 0.0;
     }
 
-    if (p < 0.0 || p > 1.0)
-    {
-        throw std::invalid_argument(
-            "percentile must be between 0 and 1.");
+    if (p < 0.0 || p > 1.0) {
+        throw std::invalid_argument("percentile must be between 0 and 1.");
     }
 
-    std::vector<double> values =
-        latencies_;
+    std::vector<double> values = latencies_;
 
-    std::sort(
-        values.begin(),
-        values.end());
+    std::sort(values.begin(), values.end());
 
     // 排序后按p*(n-1)定位，相邻样本之间线性插值；P95描述延迟尾部，不是平均值。
-    const double index =
-        p *
-        static_cast<double>(
-            values.size() - 1);
+    const double index = p * static_cast<double>(values.size() - 1);
 
-    const size_t lower =
-        static_cast<size_t>(index);
+    const size_t lower = static_cast<size_t>(index);
 
-    const size_t upper =
-        lower + 1;
+    const size_t upper = lower + 1;
 
-    if (upper >= values.size())
-    {
+    if (upper >= values.size()) {
         return values[lower];
     }
 
-    const double weight =
-        index -
-        static_cast<double>(lower);
+    const double weight = index - static_cast<double>(lower);
 
-    return values[lower] *
-               (1.0 - weight) +
-           values[upper] *
-               weight;
+    return values[lower] * (1.0 - weight) + values[upper] * weight;
 }
 
-double Benchmark::p50() const
-{
+double Benchmark::p50() const {
     return percentile(0.50);
 }
 
-double Benchmark::p95() const
-{
+double Benchmark::p95() const {
     return percentile(0.95);
 }
 
-double Benchmark::min() const
-{
+double Benchmark::min() const {
     return minimum_;
 }
 
-double Benchmark::max() const
-{
+double Benchmark::max() const {
     return maximum_;
 }
 
-size_t Benchmark::count() const
-{
+size_t Benchmark::count() const {
     return total_count_;
 }
 
-void Benchmark::print(
-    const char* name) const
-{
-    std::cout
-        << "\n========== Benchmark =========="
-        << std::endl;
+// 模块：指标展示：打印当前阶段的延迟分布和耗时倒数
+void Benchmark::print(const char* name) const {
+    std::cout << "\n========== Benchmark ==========" << std::endl;
 
-    std::cout
-        << "Backend: "
-        << name
-        << std::endl;
+    std::cout << "Backend: " << name << std::endl;
 
-    std::cout
-        << "Samples: "
-        << count()
-        << std::endl;
+    std::cout << "Samples: " << count() << std::endl;
 
-    if (latencies_.empty())
-    {
-        std::cout
-            << "没有可用的推理延迟数据。"
-            << std::endl;
+    if (latencies_.empty()) {
+        std::cout << "没有可用的推理延迟数据。" << std::endl;
 
-        std::cout
-            << "=============================="
-            << std::endl;
+        std::cout << "==============================" << std::endl;
 
         return;
     }
 
-    std::cout
-        << std::fixed
-        << std::setprecision(3);
+    std::cout << std::fixed << std::setprecision(3);
 
-    std::cout
-        << "Average: "
-        << average()
-        << " ms"
-        << std::endl;
+    std::cout << "Average: " << average() << " ms" << std::endl;
 
-    std::cout
-        << "P50:     "
-        << p50()
-        << " ms"
-        << std::endl;
+    std::cout << "P50:     " << p50() << " ms" << std::endl;
 
-    std::cout
-        << "P95:     "
-        << p95()
-        << " ms"
-        << std::endl;
+    std::cout << "P95:     " << p95() << " ms" << std::endl;
 
-    std::cout
-        << "Min:     "
-        << min()
-        << " ms"
-        << std::endl;
+    std::cout << "Min:     " << min() << " ms" << std::endl;
 
-    std::cout
-        << "Max:     "
-        << max()
-        << " ms"
-        << std::endl;
+    std::cout << "Max:     " << max() << " ms" << std::endl;
 
     // 此处只是所记录阶段平均耗时的倒数，不等于读帧、排队、绘制都计入的Pipeline FPS。
-    if (average() > 0.0)
-    {
-        std::cout
-            << "Model FPS: "
-            << 1000.0 / average()
-            << std::endl;
+    if (average() > 0.0) {
+        std::cout << "Model FPS: " << 1000.0 / average() << std::endl;
     }
 
-    std::cout
-        << "=============================="
-        << std::endl;
+    std::cout << "==============================" << std::endl;
 }
+
 /*
 ⑫ 核心问题：为什么不能只看平均 FPS？
 

@@ -5,41 +5,38 @@
 #include <string>
 #include <vector>
 
-// ==================== 推理后端统一接口 ====================
+// 模块：统一后端接口：约定推理、计时和名称查询方法
 //
 // InferenceBackend：推理后端的统一“插座”
 //
 // ORT / TensorRT 都只需要实现下面几个函数，
 // Detector 不需要关心底层到底使用哪个推理框架。
 
-class InferenceBackend
-{
+class InferenceBackend {
 public:
     virtual ~InferenceBackend() = default;
 
-    // ==================== 推理模块 ====================
+    // 模块：推理模块
     //
     // 输入：
     //   已经完成预处理的 CHW float 数据
     //
     // 输出：
     //   模型原始输出
-    virtual std::vector<float> infer(
-        const std::vector<float>& input_data) = 0;
+    virtual std::vector<float> infer(const std::vector<float>& input_data) = 0;
 
-    // ==================== 性能统计模块 ====================
+    // 模块：性能统计模块
     //
     // 返回最近一次推理耗时
     virtual double last_latency_ms() const = 0;
 
-    // ==================== 后端信息模块 ====================
+    // 模块：后端信息模块
     //
     // 例如：
     //   "ONNX Runtime"
     //   "TensorRT"
     virtual std::string name() const = 0;
 };
-
 
 /*不懂
 InferenceBackend 就是把这个共性提炼出来的契约，只暴露三件事：
@@ -50,7 +47,6 @@ name()：后端名称
 
 所有框架特有的细节（会话、显存、绑定、流）都藏在各自的实现类里，不会泄漏到接口上。
 */
-
 
 /*不懂
 2. 为什么 Detector 不直接依赖 OrtBackend？

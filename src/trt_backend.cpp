@@ -8,45 +8,28 @@
 #include <stdexcept>
 #include <vector>
 
-// ==================== TensorRT 日志模块 ====================
+// 模块：TensorRT日志：输出后端警告和错误
 
-void TrtLogger::log(
-    Severity severity,
-    const char* msg) noexcept
-{
-    if (severity <= Severity::kWARNING)
-    {
-        std::cout
-            << "[TensorRT] "
-            << msg
-            << std::endl;
+void TrtLogger::log(Severity severity, const char* msg) noexcept {
+    if (severity <= Severity::kWARNING) {
+        std::cout << "[TensorRT] " << msg << std::endl;
     }
 }
 
-// ==================== 工具函数模块 ====================
+// 模块：工具函数：计算固定形状的元素总数
 
-namespace
-{
+namespace {
 
-size_t getElementCount(
-    const nvinfer1::Dims& dims)
-{
+size_t getElementCount(const nvinfer1::Dims& dims) {
     size_t count = 1;
 
-    for (int i = 0;
-         i < dims.nbDims;
-         ++i)
-    {
-        if (dims.d[i] < 0)
-        {
-            throw std::runtime_error(
-                "TensorRT tensor contains "
-                "dynamic dimension.");
+    for (int i = 0; i < dims.nbDims; ++i) {
+        if (dims.d[i] < 0) {
+            throw std::runtime_error("TensorRT tensor contains "
+                                     "dynamic dimension.");
         }
 
-        count *=
-            static_cast<size_t>(
-                dims.d[i]);
+        count *= static_cast<size_t>(dims.d[i]);
     }
 
     return count;
@@ -54,390 +37,263 @@ size_t getElementCount(
 
 }
 
-// ==================== 构造模块 ====================
+// 模块：构造初始化：准备后端执行所需的资源
 
-TrtBackend::TrtBackend(
-    const std::string& engine_path)
-{
-    // ==================== Engine 加载 ====================
+TrtBackend::TrtBackend(const std::string& engine_path) {
+    // 模块：Engine 加载
 
     loadEngine(engine_path);
 
-    // ==================== Tensor 信息 ====================
+    // 模块：Tensor 信息
 
     inspectTensors();
 
-    // ==================== CUDA Stream ====================
+    // 模块：CUDA Stream
 
-    cudaError_t err =
-        cudaStreamCreate(&stream_);
+    cudaError_t err = cudaStreamCreate(&stream_);
 
-    if (err != cudaSuccess)
-    {
-        throw std::runtime_error(
-            "cudaStreamCreate failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("cudaStreamCreate failed: " +
+                                 std::string(cudaGetErrorString(err)));
     }
 
-    // ==================== CUDA Buffer ====================
+    // 模块：CUDA Buffer
 
     allocateBuffers();
 
-    // ==================== Tensor 地址绑定 ====================
+    // 模块：Tensor 地址绑定
     //
     // 把 TensorRT 的输入输出 Tensor
     // 连接到我们申请的 GPU Buffer。
 
-    context_->setTensorAddress(
-        input_name_.c_str(),
-        device_input_);
+    context_->setTensorAddress(input_name_.c_str(), device_input_);
 
-    context_->setTensorAddress(
-        output_name_.c_str(),
-        device_output_);
+    context_->setTensorAddress(output_name_.c_str(), device_output_);
 }
 
-// ==================== 析构模块 ====================
+// 模块：资源回收：释放GPU缓冲和执行流
 
-TrtBackend::~TrtBackend()
-{
+TrtBackend::~TrtBackend() {
     releaseBuffers();
 
-    if (stream_)
-    {
+    if (stream_) {
         cudaStreamDestroy(stream_);
 
         stream_ = nullptr;
     }
 }
 
-// ==================== Engine 加载模块 ====================
+// 模块：Engine加载：读取执行计划并创建Runtime和Context
 
-void TrtBackend::loadEngine(
-    const std::string& engine_path)
-{
-    std::ifstream file(
-        engine_path,
-        std::ios::binary);
+void TrtBackend::loadEngine(const std::string& engine_path) {
+    std::ifstream file(engine_path, std::ios::binary);
 
-    if (!file)
-    {
-        throw std::runtime_error(
-            "无法打开 TensorRT Engine: " +
-            engine_path);
+    if (!file) {
+        throw std::runtime_error("无法打开 TensorRT Engine: " + engine_path);
     }
 
-    file.seekg(
-        0,
-        std::ios::end);
+    file.seekg(0, std::ios::end);
 
-    const std::streamsize size =
-        file.tellg();
+    const std::streamsize size = file.tellg();
 
-    file.seekg(
-        0,
-        std::ios::beg);
+    file.seekg(0, std::ios::beg);
 
-    std::vector<char> buffer(
-        static_cast<size_t>(size));
+    std::vector<char> buffer(static_cast<size_t>(size));
 
-    if (!file.read(
-            buffer.data(),
-            size))
-    {
-        throw std::runtime_error(
-            "读取 TensorRT Engine 失败。");
+    if (!file.read(buffer.data(), size)) {
+        throw std::runtime_error("读取 TensorRT Engine 失败。");
     }
 
     // Runtime（工厂管理系统）
-    runtime_.reset(
-        nvinfer1::createInferRuntime(
-            logger_));
+    runtime_.reset(nvinfer1::createInferRuntime(logger_));
 
-    if (!runtime_)
-    {
-        throw std::runtime_error(
-            "createInferRuntime failed.");
+    if (!runtime_) {
+        throw std::runtime_error("createInferRuntime failed.");
     }
 
     // Engine（已经建好的生产线）
-    engine_.reset(
-        runtime_->deserializeCudaEngine(
-            buffer.data(),
-            buffer.size()));
+    engine_.reset(runtime_->deserializeCudaEngine(buffer.data(), buffer.size()));
 
-    if (!engine_)
-    {
-        throw std::runtime_error(
-            "deserializeCudaEngine failed.");
+    if (!engine_) {
+        throw std::runtime_error("deserializeCudaEngine failed.");
     }
 
     // Context（这次生产任务）
-    context_.reset(
-        engine_->createExecutionContext());
+    context_.reset(engine_->createExecutionContext());
 
-    if (!context_)
-    {
-        throw std::runtime_error(
-            "createExecutionContext failed.");
+    if (!context_) {
+        throw std::runtime_error("createExecutionContext failed.");
     }
 }
 
-// ==================== Tensor 信息模块 ====================
+// 模块：Tensor信息：保存输入输出的名称、形状和元素数量
 
-void TrtBackend::inspectTensors()
-{
-    const int tensor_count =
-        engine_->getNbIOTensors();
+void TrtBackend::inspectTensors() {
+    const int tensor_count = engine_->getNbIOTensors();
 
-    for (int i = 0;
-         i < tensor_count;
-         ++i)
-    {
-        const char* name =
-            engine_->getIOTensorName(i);
+    for (int i = 0; i < tensor_count; ++i) {
+        const char* name = engine_->getIOTensorName(i);
 
-        const auto mode =
-            engine_->getTensorIOMode(name);
+        const auto mode = engine_->getTensorIOMode(name);
 
-        const auto dims =
-            engine_->getTensorShape(name);
+        const auto dims = engine_->getTensorShape(name);
 
-        if (mode ==
-            nvinfer1::TensorIOMode::kINPUT)
-        {
+        if (mode == nvinfer1::TensorIOMode::kINPUT) {
             input_name_ = name;
 
             input_shape_.clear();
 
-            for (int j = 0;
-                 j < dims.nbDims;
-                 ++j)
-            {
-                input_shape_.push_back(
-                    dims.d[j]);
+            for (int j = 0; j < dims.nbDims; ++j) {
+                input_shape_.push_back(dims.d[j]);
             }
 
-            input_elements_ =
-                getElementCount(dims);
-        }
-        else
-        {
+            input_elements_ = getElementCount(dims);
+        } else {
             output_name_ = name;
 
             output_shape_.clear();
 
-            for (int j = 0;
-                 j < dims.nbDims;
-                 ++j)
-            {
-                output_shape_.push_back(
-                    dims.d[j]);
+            for (int j = 0; j < dims.nbDims; ++j) {
+                output_shape_.push_back(dims.d[j]);
             }
 
-            output_elements_ =
-                getElementCount(dims);
+            output_elements_ = getElementCount(dims);
         }
     }
 
-    if (input_name_.empty() ||
-        output_name_.empty())
-    {
-        throw std::runtime_error(
-            "TensorRT Engine 缺少输入或输出 Tensor。");
+    if (input_name_.empty() || output_name_.empty()) {
+        throw std::runtime_error("TensorRT Engine 缺少输入或输出 Tensor。");
     }
 
-    std::cout
-        << "TensorRT 输入 Tensor: "
-        << input_name_
-        << std::endl;
+    std::cout << "TensorRT 输入 Tensor: " << input_name_ << std::endl;
 
-    std::cout
-        << "TensorRT 输出 Tensor: "
-        << output_name_
-        << std::endl;
+    std::cout << "TensorRT 输出 Tensor: " << output_name_ << std::endl;
 }
 
-// ==================== CUDA 内存管理模块 ====================
+// 模块：CUDA 内存管理模块
 
-void TrtBackend::allocateBuffers()
-{
+void TrtBackend::allocateBuffers() {
     cudaError_t err;
 
     // GPU 显存：输入 Buffer
-    err = cudaMalloc(
-        &device_input_,
-        input_elements_ *
-            sizeof(float));
+    err = cudaMalloc(&device_input_, input_elements_ * sizeof(float));
 
-    if (err != cudaSuccess)
-    {
-        throw std::runtime_error(
-            "cudaMalloc input failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("cudaMalloc input failed: " +
+                                 std::string(cudaGetErrorString(err)));
     }
 
     // GPU 显存：输出 Buffer
-    err = cudaMalloc(
-        &device_output_,
-        output_elements_ *
-            sizeof(float));
+    err = cudaMalloc(&device_output_, output_elements_ * sizeof(float));
 
-    if (err != cudaSuccess)
-    {
+    if (err != cudaSuccess) {
         cudaFree(device_input_);
 
         device_input_ = nullptr;
 
-        throw std::runtime_error(
-            "cudaMalloc output failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+        throw std::runtime_error("cudaMalloc output failed: " +
+                                 std::string(cudaGetErrorString(err)));
     }
 }
 
-void TrtBackend::releaseBuffers()
-{
-    if (device_input_)
-    {
+void TrtBackend::releaseBuffers() {
+    if (device_input_) {
         cudaFree(device_input_);
 
         device_input_ = nullptr;
     }
 
-    if (device_output_)
-    {
+    if (device_output_) {
         cudaFree(device_output_);
 
         device_output_ = nullptr;
     }
 }
 
-// ==================== TensorRT 推理模块 ====================
+// 模块：TensorRT 推理模块
 
-std::vector<float> TrtBackend::infer(
-    const std::vector<float>& input_data)
-{
-    if (input_data.size() !=
-        input_elements_)
-    {
-        throw std::runtime_error(
-            "TensorRT 输入数据大小不匹配。");
+std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
+    if (input_data.size() != input_elements_) {
+        throw std::runtime_error("TensorRT 输入数据大小不匹配。");
     }
 
-    std::vector<float> output(
-        output_elements_);
+    std::vector<float> output(output_elements_);
 
-    // ==================== H2D ====================
+    // 模块：H2D
     //
     // H2D（仓库 → 工厂）
     // CPU 内存 → GPU 显存
 
-    cudaError_t err =
-        cudaMemcpyAsync(
-            device_input_,
-            input_data.data(),
-            input_elements_ *
-                sizeof(float),
-            cudaMemcpyHostToDevice,
-            stream_);
+    cudaError_t err = cudaMemcpyAsync(device_input_,
+                                      input_data.data(),
+                                      input_elements_ * sizeof(float),
+                                      cudaMemcpyHostToDevice,
+                                      stream_);
 
-    if (err != cudaSuccess)
-    {
-        throw std::runtime_error(
-            "H2D failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("H2D failed: " + std::string(cudaGetErrorString(err)));
     }
 
-    // ==================== TensorRT 执行 ====================
+    // 模块：TensorRT 执行
     //
     // Engine（生产线）
     // Context（本次任务）
     // Stream（传送带）
 
-    auto start =
-        std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
-    if (!context_->enqueueV3(stream_))
-    {
-        throw std::runtime_error(
-            "TensorRT enqueueV3 failed.");
+    if (!context_->enqueueV3(stream_)) {
+        throw std::runtime_error("TensorRT enqueueV3 failed.");
     }
 
     // 等待 GPU 执行完成
-    err =
-        cudaStreamSynchronize(stream_);
+    err = cudaStreamSynchronize(stream_);
 
-    if (err != cudaSuccess)
-    {
-        throw std::runtime_error(
-            "cudaStreamSynchronize failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("cudaStreamSynchronize failed: " +
+                                 std::string(cudaGetErrorString(err)));
     }
 
-    auto end =
-        std::chrono::steady_clock::now();
+    auto end = std::chrono::steady_clock::now();
 
-    last_latency_ms_ =
-        std::chrono::duration<
-            double,
-            std::milli>(
-                end - start)
-            .count();
+    last_latency_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
-    // ==================== D2H ====================
+    // 模块：D2H
     //
     // D2H（工厂 → 仓库）
     // GPU 显存 → CPU 内存
 
-    err =
-        cudaMemcpyAsync(
-            output.data(),
-            device_output_,
-            output_elements_ *
-                sizeof(float),
-            cudaMemcpyDeviceToHost,
-            stream_);
+    err = cudaMemcpyAsync(output.data(),
+                          device_output_,
+                          output_elements_ * sizeof(float),
+                          cudaMemcpyDeviceToHost,
+                          stream_);
 
-    if (err != cudaSuccess)
-    {
-        throw std::runtime_error(
-            "D2H failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("D2H failed: " + std::string(cudaGetErrorString(err)));
     }
 
-    err =
-        cudaStreamSynchronize(stream_);
+    err = cudaStreamSynchronize(stream_);
 
-    if (err != cudaSuccess)
-    {
-        throw std::runtime_error(
-            "D2H synchronize failed: " +
-            std::string(
-                cudaGetErrorString(err)));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("D2H synchronize failed: " + std::string(cudaGetErrorString(err)));
     }
 
     return output;
 }
 
-// ==================== 性能信息模块 ====================
+// 模块：计时查询：返回最近一次后端调用统计
 
-double TrtBackend::last_latency_ms() const
-{
+double TrtBackend::last_latency_ms() const {
     return last_latency_ms_;
 }
 
-// ==================== 后端名称模块 ====================
+// 模块：后端识别：返回当前实现的名称
 
-std::string TrtBackend::name() const
-{
+std::string TrtBackend::name() const {
     return "TensorRT";
 }
+
 /*
 
 1. Engine 怎么加载？

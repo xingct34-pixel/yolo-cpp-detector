@@ -7,52 +7,38 @@
 #include <string>
 #include <vector>
 
-class YoloInt8Calibrator
-    : public nvinfer1::IInt8EntropyCalibrator2
-{
+// 模块：校准器接口：为TensorRT提供输入批次及校准缓存（实验路径）
+class YoloInt8Calibrator : public nvinfer1::IInt8EntropyCalibrator2 {
 public:
-    YoloInt8Calibrator(
-        const std::string& image_dir,
-        const std::string& cache_file,
-        int batch_size = 1,
-        int input_width = 640,
-        int input_height = 640);
+    YoloInt8Calibrator(const std::string& image_dir,
+                       const std::string& cache_file,
+                       int batch_size = 1,
+                       int input_width = 640,
+                       int input_height = 640);
 
     ~YoloInt8Calibrator() override;
 
     int getBatchSize() const noexcept override;
 
-    bool getBatch(
-        void* bindings[],
-        const char* names[],
-        int nbBindings) noexcept override;
+    bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override;
 
-    const void* readCalibrationCache(
-        std::size_t& length) noexcept override;
+    const void* readCalibrationCache(std::size_t& length) noexcept override;
 
-    void writeCalibrationCache(
-        const void* cache,
-        std::size_t length) noexcept override;
+    void writeCalibrationCache(const void* cache, std::size_t length) noexcept override;
 
 private:
-    void loadImagePaths(
-        const std::string& image_dir);
+    void loadImagePaths(const std::string& image_dir);
 
-    bool preprocessImage(
-        const std::string& image_path,
-        float* output);
+    bool preprocessImage(const std::string& image_path, float* output);
 
 private:
-    std::vector<std::string>
-        image_paths_;
+    std::vector<std::string> image_paths_;
 
     std::string cache_file_;
 
-    std::vector<char>
-        calibration_cache_;
+    std::vector<char> calibration_cache_;
 
-    std::vector<float>
-        host_batch_;
+    std::vector<float> host_batch_;
 
     void* device_input_ = nullptr;
 

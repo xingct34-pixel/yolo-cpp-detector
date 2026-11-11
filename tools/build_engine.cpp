@@ -13,20 +13,18 @@
 #include <stdexcept>
 #include <string>
 
-class BuildLogger : public nvinfer1::ILogger
-{
+// 模块：构建日志：输出TensorRT警告及错误（实验路径）
+class BuildLogger : public nvinfer1::ILogger {
 public:
-    void log(Severity severity, const char* msg) noexcept override
-    {
-        if (severity <= Severity::kWARNING)
-        {
+    void log(Severity severity, const char* msg) noexcept override {
+        if (severity <= Severity::kWARNING) {
             std::cout << "[TensorRT] " << msg << '\n';
         }
     }
 };
 
-struct BuildConfig
-{
+// 模块：构建配置：记录模型、精度、校准数据与工作空间
+struct BuildConfig {
     std::string onnx_path;
     std::string engine_path;
 
@@ -42,42 +40,37 @@ struct BuildConfig
     size_t workspace_gb = 2;
 };
 
-static void printUsage(const char* program)
-{
-    std::cout
-        << "\n用法:\n"
-        << "  " << program
-        << " --onnx <model.onnx>"
-        << " --engine <model.engine>"
-        << " --precision <fp32|fp16|int8>"
-        << " [options]\n\n"
-        << "参数:\n"
-        << "  --onnx <path>          输入 ONNX 模型\n"
-        << "  --engine <path>        输出 TensorRT Engine\n"
-        << "  --precision <mode>     fp32 / fp16 / int8\n"
-        << "  --calib-dir <path>     INT8 校准图片目录\n"
-        << "  --calib-cache <path>   INT8 校准缓存文件\n"
-        << "  --batch-size <N>       INT8 校准 Batch Size\n"
-        << "  --workspace-gb <N>     Workspace 上限（GB）\n"
-        << "  --help                 显示帮助\n\n";
+// 模块：帮助输出：说明Engine构建工具的命令行参数
+static void printUsage(const char* program) {
+    std::cout << "\n用法:\n"
+              << "  " << program << " --onnx <model.onnx>"
+              << " --engine <model.engine>"
+              << " --precision <fp32|fp16|int8>"
+              << " [options]\n\n"
+              << "参数:\n"
+              << "  --onnx <path>          输入 ONNX 模型\n"
+              << "  --engine <path>        输出 TensorRT Engine\n"
+              << "  --precision <mode>     fp32 / fp16 / int8\n"
+              << "  --calib-dir <path>     INT8 校准图片目录\n"
+              << "  --calib-cache <path>   INT8 校准缓存文件\n"
+              << "  --batch-size <N>       INT8 校准 Batch Size\n"
+              << "  --workspace-gb <N>     Workspace 上限（GB）\n"
+              << "  --help                 显示帮助\n\n";
 }
 
-static BuildConfig parseArguments(int argc, char* argv[])
-{
+// 模块：参数解析：读取并校验构建所需选项
+static BuildConfig parseArguments(int argc, char* argv[]) {
     BuildConfig config;
 
-    for (int i = 1; i < argc; ++i)
-    {
+    for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
 
-        if (arg == "--help")
-        {
+        if (arg == "--help") {
             printUsage(argv[0]);
             std::exit(0);
         }
 
-        if (i + 1 >= argc)
-        {
+        if (i + 1 >= argc) {
             throw std::runtime_error("参数缺少值: " + arg);
         }
 
@@ -96,81 +89,60 @@ static BuildConfig parseArguments(int argc, char* argv[])
         else if (arg == "--batch-size")
             config.batch_size = std::stoi(value);
         else if (arg == "--workspace-gb")
-            config.workspace_gb =
-                static_cast<size_t>(std::stoull(value));
+            config.workspace_gb = static_cast<size_t>(std::stoull(value));
         else
             throw std::runtime_error("未知参数: " + arg);
     }
 
-    if (config.onnx_path.empty() || config.engine_path.empty())
-    {
-        throw std::runtime_error(
-            "--onnx 和 --engine 是必需参数。");
+    if (config.onnx_path.empty() || config.engine_path.empty()) {
+        throw std::runtime_error("--onnx 和 --engine 是必需参数。");
     }
 
-    if (config.precision != "fp32" &&
-        config.precision != "fp16" &&
-        config.precision != "int8")
-    {
-        throw std::runtime_error(
-            "--precision 必须是 fp32 / fp16 / int8。");
+    if (config.precision != "fp32" && config.precision != "fp16" && config.precision != "int8") {
+        throw std::runtime_error("--precision 必须是 fp32 / fp16 / int8。");
     }
 
-    if (config.batch_size <= 0 || config.workspace_gb == 0)
-    {
-        throw std::runtime_error(
-            "--batch-size 和 --workspace-gb 必须大于 0。");
+    if (config.batch_size <= 0 || config.workspace_gb == 0) {
+        throw std::runtime_error("--batch-size 和 --workspace-gb 必须大于 0。");
     }
 
-    if (config.precision == "int8" && config.calib_dir.empty())
-    {
-        throw std::runtime_error(
-            "INT8 模式必须提供 --calib-dir。");
+    if (config.precision == "int8" && config.calib_dir.empty()) {
+        throw std::runtime_error("INT8 模式必须提供 --calib-dir。");
     }
 
     return config;
 }
 
+// 模块：产物保存：把序列化Engine写入目标文件
 // 将构建后的 Engine（二进制推理执行计划）保存到磁盘。
-static void saveEngine(
-    const std::string& path,
-    const nvinfer1::IHostMemory& serialized)
-{
+static void saveEngine(const std::string& path, const nvinfer1::IHostMemory& serialized) {
     const std::filesystem::path output_path(path);
 
-    if (!output_path.parent_path().empty())
-    {
-        std::filesystem::create_directories(
-            output_path.parent_path());
+    if (!output_path.parent_path().empty()) {
+        std::filesystem::create_directories(output_path.parent_path());
     }
 
     std::ofstream output(path, std::ios::binary);
 
-    if (!output)
-    {
+    if (!output) {
         throw std::runtime_error("无法创建 Engine 文件: " + path);
     }
 
-    output.write(
-        static_cast<const char*>(serialized.data()),
-        static_cast<std::streamsize>(serialized.size()));
+    output.write(static_cast<const char*>(serialized.data()),
+                 static_cast<std::streamsize>(serialized.size()));
 
-    if (!output)
-    {
+    if (!output) {
         throw std::runtime_error("写入 Engine 文件失败: " + path);
     }
 }
 
-int main(int argc, char* argv[])
-{
-    try
-    {
+// 模块：构建入口：解析ONNX，配置精度并生成Engine（未在本机验收）
+int main(int argc, char* argv[]) {
+    try {
         const BuildConfig config = parseArguments(argc, argv);
 
-        if (!std::filesystem::exists(config.onnx_path))
-        {
-            throw std::runtime_error(
-                "ONNX 文件不存在: " + config.onnx_path);
+        if (!std::filesystem::exists(config.onnx_path)) {
+            throw std::runtime_error("ONNX 文件不存在: " + config.onnx_path);
         }
 
         BuildLogger logger;
@@ -182,51 +154,37 @@ int main(int argc, char* argv[])
                   << "Workspace:  " << config.workspace_gb << " GB\n";
 
         // 1. Builder：建厂工程师，负责创建推理执行计划。
-        std::unique_ptr<nvinfer1::IBuilder> builder(
-            nvinfer1::createInferBuilder(logger));
+        std::unique_ptr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
 
-        if (!builder)
-        {
+        if (!builder) {
             throw std::runtime_error("createInferBuilder 失败。");
         }
 
         // 2. Network：生产线设计图，接收 ONNX 解析出的网络结构。
         const uint32_t flags =
-            1U << static_cast<uint32_t>(
-                nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
+            1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
 
-        std::unique_ptr<nvinfer1::INetworkDefinition> network(
-            builder->createNetworkV2(flags));
+        std::unique_ptr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(flags));
 
-        if (!network)
-        {
+        if (!network) {
             throw std::runtime_error("createNetworkV2 失败。");
         }
 
         // 3. Parser：读取 ONNX 文件，并将其转换为 TensorRT 网络定义。
-        std::unique_ptr<nvonnxparser::IParser> parser(
-            nvonnxparser::createParser(*network, logger));
+        std::unique_ptr<nvonnxparser::IParser> parser(nvonnxparser::createParser(*network, logger));
 
-        if (!parser)
-        {
+        if (!parser) {
             throw std::runtime_error("createParser 失败。");
         }
 
-        std::cout << "\n开始解析 ONNX: "
-                  << config.onnx_path << '\n';
+        std::cout << "\n开始解析 ONNX: " << config.onnx_path << '\n';
 
-        if (!parser->parseFromFile(
-                config.onnx_path.c_str(),
-                static_cast<int>(
-                    nvinfer1::ILogger::Severity::kWARNING)))
-        {
-            for (int i = 0; i < parser->getNbErrors(); ++i)
-            {
+        if (!parser->parseFromFile(config.onnx_path.c_str(),
+                                   static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
+            for (int i = 0; i < parser->getNbErrors(); ++i) {
                 const auto* error = parser->getError(i);
-                if (error)
-                {
-                    std::cerr << "[ONNX Parser] "
-                              << error->desc() << '\n';
+                if (error) {
+                    std::cerr << "[ONNX Parser] " << error->desc() << '\n';
                 }
             }
 
@@ -236,61 +194,44 @@ int main(int argc, char* argv[])
         std::cout << "ONNX 解析成功。\n";
 
         // 4. BuilderConfig：设置精度、显存工作区等构建选项。
-        std::unique_ptr<nvinfer1::IBuilderConfig> builder_config(
-            builder->createBuilderConfig());
+        std::unique_ptr<nvinfer1::IBuilderConfig> builder_config(builder->createBuilderConfig());
 
-        if (!builder_config)
-        {
+        if (!builder_config) {
             throw std::runtime_error("createBuilderConfig 失败。");
         }
 
-        const size_t workspace_bytes =
-            config.workspace_gb * 1024ULL * 1024ULL * 1024ULL;
+        const size_t workspace_bytes = config.workspace_gb * 1024ULL * 1024ULL * 1024ULL;
 
-        builder_config->setMemoryPoolLimit(
-            nvinfer1::MemoryPoolType::kWORKSPACE,
-            workspace_bytes);
+        builder_config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, workspace_bytes);
 
         // 5. 按指定精度配置构建选项。
         std::unique_ptr<Int8Calibrator> calibrator;
 
-        if (config.precision == "fp32")
-        {
+        if (config.precision == "fp32") {
             std::cout << "使用 FP32 精度。\n";
-        }
-        else if (config.precision == "fp16")
-        {
-            if (!builder->platformHasFastFp16())
-            {
-                std::cerr
-                    << "警告：设备未报告快速 FP16 支持，"
-                    << "仍尝试设置 FP16 标志。\n";
+        } else if (config.precision == "fp16") {
+            if (!builder->platformHasFastFp16()) {
+                std::cerr << "警告：设备未报告快速 FP16 支持，"
+                          << "仍尝试设置 FP16 标志。\n";
             }
 
-            builder_config->setFlag(
-                nvinfer1::BuilderFlag::kFP16);
+            builder_config->setFlag(nvinfer1::BuilderFlag::kFP16);
 
             std::cout << "已启用 FP16 构建选项。\n";
-        }
-        else if (config.precision == "int8")
-        {
-            if (!builder->platformHasFastInt8())
-            {
-                std::cerr
-                    << "警告：设备未报告快速 INT8 支持，"
-                    << "仍尝试设置 INT8 标志。\n";
+        } else if (config.precision == "int8") {
+            if (!builder->platformHasFastInt8()) {
+                std::cerr << "警告：设备未报告快速 INT8 支持，"
+                          << "仍尝试设置 INT8 标志。\n";
             }
 
-            builder_config->setFlag(
-                nvinfer1::BuilderFlag::kINT8);
+            builder_config->setFlag(nvinfer1::BuilderFlag::kINT8);
 
             // Int8Calibrator 必须与 int8_calibrator.h/.cpp 的接口一致。
-            calibrator = std::make_unique<Int8Calibrator>(
-                config.batch_size,
-                config.input_width,
-                config.input_height,
-                config.calib_dir,
-                config.calib_cache);
+            calibrator = std::make_unique<Int8Calibrator>(config.batch_size,
+                                                          config.input_width,
+                                                          config.input_height,
+                                                          config.calib_dir,
+                                                          config.calib_cache);
 
             builder_config->setInt8Calibrator(calibrator.get());
 
@@ -304,14 +245,10 @@ int main(int argc, char* argv[])
         std::cout << "\n开始构建 Engine，耗时取决于模型和硬件...\n";
 
         std::unique_ptr<nvinfer1::IHostMemory> serialized(
-            builder->buildSerializedNetwork(
-                *network,
-                *builder_config));
+            builder->buildSerializedNetwork(*network, *builder_config));
 
-        if (!serialized)
-        {
-            throw std::runtime_error(
-                "buildSerializedNetwork 失败，未生成 Engine。");
+        if (!serialized) {
+            throw std::runtime_error("buildSerializedNetwork 失败，未生成 Engine。");
         }
 
         // 7. 保存序列化结果。
@@ -319,19 +256,15 @@ int main(int argc, char* argv[])
 
         std::cout << "\nEngine 构建成功。\n"
                   << "输出路径: " << config.engine_path << '\n'
-                  << "文件大小: "
-                  << serialized->size() / (1024.0 * 1024.0)
-                  << " MB\n";
+                  << "文件大小: " << serialized->size() / (1024.0 * 1024.0) << " MB\n";
 
         return 0;
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << "\n[BuildEngine Error] "
-                  << e.what() << '\n';
+    } catch (const std::exception& e) {
+        std::cerr << "\n[BuildEngine Error] " << e.what() << '\n';
         return 1;
     }
 }
+
 /*
 1. Parser 干什么？
 

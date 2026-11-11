@@ -5,29 +5,19 @@
 #include <iostream>
 #include <stdexcept>
 
-// ==================== Session 配置模块 ====================
+// 模块：Session配置：设置CPU线程数和可选执行后端
 
-Ort::SessionOptions
-OrtBackend::makeSessionOptions(
-    bool use_cuda)
-{
+Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
     Ort::SessionOptions options;
 
     // 单个算子内部默认使用3个CPU线程，可由环境变量覆盖；与视频Pipeline的角色线程数不同。
     int intra_op_threads = 3;
 
-    if (const char* env_value =
-            std::getenv("YOLO_ORT_INTRA_OP_THREADS"))
-    {
+    if (const char* env_value = std::getenv("YOLO_ORT_INTRA_OP_THREADS")) {
         char* end = nullptr;
-        const long parsed =
-            std::strtol(env_value, &end, 10);
+        const long parsed = std::strtol(env_value, &end, 10);
 
-        if (end == env_value ||
-            *end != 0 ||
-            parsed < 1 ||
-            parsed > 64)
-        {
+        if (end == env_value || *end != 0 || parsed < 1 || parsed > 64) {
             throw std::invalid_argument(
                 "YOLO_ORT_INTRA_OP_THREADS must be an integer from 1 to 64.");
         }
@@ -37,12 +27,9 @@ OrtBackend::makeSessionOptions(
 
     options.SetIntraOpNumThreads(intra_op_threads);
 
-    std::cout
-        << "ONNX Runtime intra-op threads: "
-        << intra_op_threads
-        << std::endl;
+    std::cout << "ONNX Runtime intra-op threads: " << intra_op_threads << std::endl;
 
-    // ==================== CUDA Execution Provider 模块 ====================
+    // 模块：CUDA Execution Provider 模块
     //
     // CUDA Execution Provider
     // = GPU 推理执行后端
@@ -50,129 +37,87 @@ OrtBackend::makeSessionOptions(
     // 当前机器如果暂时无法稳定运行 CUDA，
     // 可以使用 CPU 模式启动项目。
 
-    if (use_cuda)
-    {
+    if (use_cuda) {
         OrtCUDAProviderOptions cuda_options{};
 
         cuda_options.device_id = 0;
 
-        options.AppendExecutionProvider_CUDA(
-            cuda_options);
+        options.AppendExecutionProvider_CUDA(cuda_options);
     }
 
     return options;
 }
 
-// ==================== 构造模块 ====================
+// 模块：构造初始化：准备后端执行所需的资源
 
-OrtBackend::OrtBackend(
-    const std::string& model_path,
-    bool use_cuda)
-    : env_(
-          ORT_LOGGING_LEVEL_WARNING,
-          "YOLO"),
-      session_(
-          env_,
-          model_path.c_str(),
-          makeSessionOptions(use_cuda))
-{
-    // ==================== 输入输出 Tensor 信息模块 ====================
+OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
+    : env_(ORT_LOGGING_LEVEL_WARNING, "YOLO"),
+      session_(env_, model_path.c_str(), makeSessionOptions(use_cuda)) {
+    // 模块：模型约定：查询名称、类型和形状并拒绝不匹配模型
 
     Ort::AllocatorWithDefaultOptions allocator;
 
-    auto input_name =
-        session_.GetInputNameAllocated(
-            0,
-            allocator);
+    auto input_name = session_.GetInputNameAllocated(0, allocator);
 
-    auto output_name =
-        session_.GetOutputNameAllocated(
-            0,
-            allocator);
+    auto output_name = session_.GetOutputNameAllocated(0, allocator);
 
     // 保存到std::string中：allocator管理的临时名称退出作用域后，成员名称仍有效。
-    input_name_ =
-        input_name.get();
+    input_name_ = input_name.get();
 
-    output_name_ =
-        output_name.get();
+    output_name_ = output_name.get();
 
     // 获取输入 Shape
-    auto input_type_info =
-        session_.GetInputTypeInfo(0);
+    auto input_type_info = session_.GetInputTypeInfo(0);
 
-    auto input_tensor_info =
-        input_type_info.GetTensorTypeAndShapeInfo();
+    auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
 
-    input_shape_ =
-        input_tensor_info.GetShape();
+    input_shape_ = input_tensor_info.GetShape();
 
     // 本适配层只接固定float32输入[1,3,640,640]、输出[1,84,8400]。
     // 动态尺寸、不同类别数或带NMS的导出模型需要另行适配，不能只改一个8400常量。
-    if(session_.GetInputCount()!=1 || session_.GetOutputCount()!=1 ||
-       input_tensor_info.GetElementType()!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
-       input_shape_!=std::vector<int64_t>({1,3,640,640}))
+    if (session_.GetInputCount() != 1 || session_.GetOutputCount() != 1 ||
+        input_tensor_info.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
+        input_shape_ != std::vector<int64_t>({1, 3, 640, 640}))
         throw std::runtime_error("expected one float32 input [1,3,640,640] and one output");
-    auto out_type=session_.GetOutputTypeInfo(0);
-    auto out_info=out_type.GetTensorTypeAndShapeInfo();
-    if(out_info.GetElementType()!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
-       out_info.GetShape()!=std::vector<int64_t>({1,84,8400}))
+    auto out_type = session_.GetOutputTypeInfo(0);
+    auto out_info = out_type.GetTensorTypeAndShapeInfo();
+    if (out_info.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
+        out_info.GetShape() != std::vector<int64_t>({1, 84, 8400}))
         throw std::runtime_error("expected float32 output [1,84,8400]");
-    std::cout
-        << "ONNX Runtime 输入 Tensor: "
-        << input_name_
-        << std::endl;
+    std::cout << "ONNX Runtime 输入 Tensor: " << input_name_ << std::endl;
 
-    std::cout
-        << "ONNX Runtime 输出 Tensor: "
-        << output_name_
-        << std::endl;
+    std::cout << "ONNX Runtime 输出 Tensor: " << output_name_ << std::endl;
 
-    std::cout
-        << "模型加载成功"
-        << std::endl;
+    std::cout << "模型加载成功" << std::endl;
 }
 
-// ==================== 推理模块 ====================
+// 模块：推理模块
 
-std::vector<float> OrtBackend::infer(
-    const std::vector<float>& input_data)
-{
-    // ==================== 输入 Tensor 创建模块 ====================
+std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
+    // 模块：输入包装：描述CPU内存并创建借用数组的Tensor
     //
     // Tensor（输入货物）
     //
     // 当前使用 CPU 内存作为输入，
     // CUDA Execution Provider 会负责后续的数据传输。
 
-    if(input_data.size()!=3u*640*640)throw std::invalid_argument("invalid YOLO input size");
-    Ort::MemoryInfo memory_info =
-        Ort::MemoryInfo::CreateCpu(
-            OrtArenaAllocator,
-            OrtMemTypeDefault);
+    if (input_data.size() != 3u * 640 * 640)
+        throw std::invalid_argument("invalid YOLO input size");
+    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 
     // 包装现成vector的内存，不复制输入；同步Run结束前input_data必须保持有效且不能扩容。
     // input_data.size()是float元素个数，不是字节数；shape说明这些元素怎样分组。
-    Ort::Value input_tensor =
-        Ort::Value::CreateTensor<float>(
-            memory_info,
-            const_cast<float*>(
-                input_data.data()),
-            input_data.size(),
-            input_shape_.data(),
-            input_shape_.size());
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info,
+                                                              const_cast<float*>(input_data.data()),
+                                                              input_data.size(),
+                                                              input_shape_.data(),
+                                                              input_shape_.size());
 
-    const char* input_names[] =
-    {
-        input_name_.c_str()
-    };
+    const char* input_names[] = {input_name_.c_str()};
 
-    const char* output_names[] =
-    {
-        output_name_.c_str()
-    };
+    const char* output_names[] = {output_name_.c_str()};
 
-    // ==================== Runtime 执行模块 ====================
+    // 模块：推理执行：按名称绑定数据并测量同步Run调用
     //
     // Runtime（工厂管理系统）
     // Session（执行环境）
@@ -180,79 +125,49 @@ std::vector<float> OrtBackend::infer(
 
     // 只计同步Run调用：不含输入张量包装、后面的输出复制及Detector预后处理。
     // CUDA路径还可能含EP管理的数据传输，这不是单独GPU kernel耗时，也未在本机验收。
-    auto start =
-        std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
     auto outputs =
-        session_.Run(
-            Ort::RunOptions{nullptr},
-            input_names,
-            &input_tensor,
-            1,
-            output_names,
-            1);
+        session_.Run(Ort::RunOptions{nullptr}, input_names, &input_tensor, 1, output_names, 1);
 
-    auto end =
-        std::chrono::steady_clock::now();
+    auto end = std::chrono::steady_clock::now();
 
-    last_latency_ms_ =
-        std::chrono::duration<
-            double,
-            std::milli>(
-                end - start)
-            .count();
+    last_latency_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
-    // ==================== 输出 Tensor 获取模块 ====================
+    // 模块：输出读取：检查Tensor形状并复制结果到自有数组
 
-    if (outputs.empty())
-    {
-        throw std::runtime_error(
-            "ONNX Runtime 没有返回输出。");
+    if (outputs.empty()) {
+        throw std::runtime_error("ONNX Runtime 没有返回输出。");
     }
 
-    float* output_data =
-        outputs[0]
-            .GetTensorMutableData<float>();
+    float* output_data = outputs[0].GetTensorMutableData<float>();
 
-    auto output_info =
-        outputs[0]
-            .GetTensorTypeAndShapeInfo();
+    auto output_info = outputs[0].GetTensorTypeAndShapeInfo();
 
-    const auto output_shape =
-        output_info.GetShape();
+    const auto output_shape = output_info.GetShape();
 
-    if (output_shape.size() != 3 ||
-        output_shape[0] != 1 ||
-        output_shape[1] != 84 ||
-        output_shape[2] != 8400)
-    {
-        throw std::runtime_error(
-            "YOLO 输出 Tensor 形状异常，期望 [1, 84, 8400]。");
+    if (output_shape.size() != 3 || output_shape[0] != 1 || output_shape[1] != 84 ||
+        output_shape[2] != 8400) {
+        throw std::runtime_error("YOLO 输出 Tensor 形状异常，期望 [1, 84, 8400]。");
     }
 
-    const size_t output_count =
-        output_info.GetElementCount();
+    const size_t output_count = output_info.GetElementCount();
 
     // 输出指针属于outputs中的Ort::Value；复制到自己的vector，函数返回后数据才仍有效。
-    return std::vector<float>(
-        output_data,
-        output_data + output_count);
+    return std::vector<float>(output_data, output_data + output_count);
 }
 
-// ==================== 性能信息模块 ====================
+// 模块：计时查询：返回最近一次后端调用统计
 
-double OrtBackend::last_latency_ms() const
-{
+double OrtBackend::last_latency_ms() const {
     return last_latency_ms_;
 }
 
-// ==================== 后端名称模块 ====================
+// 模块：后端识别：返回当前实现的名称
 
-std::string OrtBackend::name() const
-{
+std::string OrtBackend::name() const {
     return "ONNX Runtime";
 }
-
 
 /*
 
