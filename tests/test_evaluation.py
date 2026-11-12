@@ -1,0 +1,60 @@
+import copy
+import importlib.util
+from pathlib import Path
+import unittest
+
+spec = importlib.util.spec_from_file_location(
+    'evaluation', Path(__file__).resolve().parents[1] / 'tools/evaluate_detection.py'
+)
+evaluation = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(evaluation)
+
+
+# 模块：已知答案：用可手算的预测验收AP、重复框、错误类别和非法数据
+
+
+class EvaluationTests(unittest.TestCase):
+    def setUp(self):
+        self.dataset = {
+            'images': [{'id': 1}, {'id': 2}],
+            'categories': [{'id': 1}, {'id': 2}],
+            'annotations': [
+                {'image_id': 1, 'category_id': 1, 'bbox': [0, 0, 10, 10]},
+                {'image_id': 2, 'category_id': 1, 'bbox': [0, 0, 10, 10]},
+            ],
+        }
+        self.predictions = [dict(row, score=0.8) for row in self.dataset['annotations']]
+
+    def test_perfect_and_empty(self):
+        self.assertAlmostEqual(evaluation.evaluate(self.dataset, self.predictions)['mAP50_95'], 1)
+        self.assertEqual(evaluation.evaluate(self.dataset, [])['AP50'], 0)
+
+    def test_half_recall_and_false_positive(self):
+        self.assertAlmostEqual(
+            evaluation.evaluate(self.dataset, self.predictions[:1])['AP50'], 51 / 101
+        )
+        false = dict(self.predictions[0], score=0.9, bbox=[50, 50, 10, 10])
+        self.assertAlmostEqual(
+            evaluation.evaluate(self.dataset, [false] + self.predictions)['AP50'], 2 / 3
+        )
+
+    def test_class_and_iou(self):
+        wrong = [dict(p, category_id=2) for p in self.predictions]
+        self.assertEqual(evaluation.evaluate(self.dataset, wrong)['AP50'], 0)
+        shifted = [dict(p, bbox=[2, 0, 10, 10]) for p in self.predictions]
+        result = evaluation.evaluate(self.dataset, shifted)
+        self.assertEqual(result['AP50'], 1)
+        self.assertEqual(result['AP75'], 0)
+
+    def test_reject_unsupported_and_corrupt(self):
+        dataset = copy.deepcopy(self.dataset)
+        dataset['annotations'][0]['iscrowd'] = 1
+        with self.assertRaises(ValueError):
+            evaluation.evaluate(dataset, self.predictions)
+        for change in [{'bbox': [0, 0, 0, 1]}, {'score': float('nan')}, {'image_id': 999}]:
+            with self.assertRaises(ValueError):
+                evaluation.evaluate(self.dataset, [dict(self.predictions[0], **change)])
+
+
+if __name__ == '__main__':
+    unittest.main()

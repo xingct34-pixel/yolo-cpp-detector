@@ -15,3 +15,7 @@ jobs:
           ./results/queue_test
           g++ -std=c++17 -Iinclude tests/test_benchmark.cpp src/benchmark.cpp -o results/benchmark_test
           ./results/benchmark_test
+      - name: Detection AP and profile aggregation checks without datasets
+        run: |
+          python3 tests/test_evaluation.py
+          python3 tests/test_profile.py

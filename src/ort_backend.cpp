@@ -5,7 +5,9 @@
 #include <iostream>
 #include <stdexcept>
 
+
 // 模块：Session配置：设置CPU线程数和可选执行后端
+
 
 Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
     Ort::SessionOptions options;
@@ -27,7 +29,33 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
 
     options.SetIntraOpNumThreads(intra_op_threads);
 
+
+    // 模块：可选性能诊断：默认保持ORT优化级别，显式指定时校验参数再开启
+    // Profile会增加测量开销；其结果用于定位算子，正式延迟报告应关闭Profile重新测量。
+
+
+    if (const char* level = std::getenv("YOLO_ORT_GRAPH_OPT")) {
+        const std::string value(level);
+        if (value == "disabled")
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_DISABLE_ALL);
+        else if (value == "basic")
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_BASIC);
+        else if (value == "extended")
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+        else if (value == "all")
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+        else
+            throw std::invalid_argument("YOLO_ORT_GRAPH_OPT must be disabled/basic/extended/all");
+    }
+    if (const char* prefix = std::getenv("YOLO_ORT_PROFILE")) {
+        if (!*prefix)
+            throw std::invalid_argument("YOLO_ORT_PROFILE cannot be empty");
+        options.EnableProfiling(prefix);
+    }
+
+
     std::cout << "ONNX Runtime intra-op threads: " << intra_op_threads << std::endl;
+
 
     // 模块：CUDA Execution Provider 模块
     //
@@ -36,6 +64,7 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
     //
     // 当前机器如果暂时无法稳定运行 CUDA，
     // 可以使用 CPU 模式启动项目。
+
 
     if (use_cuda) {
         OrtCUDAProviderOptions cuda_options{};
@@ -48,12 +77,17 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
     return options;
 }
 
+
 // 模块：构造初始化：准备后端执行所需的资源
+
 
 OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
     : env_(ORT_LOGGING_LEVEL_WARNING, "YOLO"),
       session_(env_, model_path.c_str(), makeSessionOptions(use_cuda)) {
+
+
     // 模块：模型约定：查询名称、类型和形状并拒绝不匹配模型
+
 
     Ort::AllocatorWithDefaultOptions allocator;
 
@@ -91,15 +125,20 @@ OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
     std::cout << "模型加载成功" << std::endl;
 }
 
+
 // 模块：推理模块
 
+
 std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
+
+
     // 模块：输入包装：描述CPU内存并创建借用数组的Tensor
     //
     // Tensor（输入货物）
     //
     // 当前使用 CPU 内存作为输入，
     // CUDA Execution Provider 会负责后续的数据传输。
+
 
     if (input_data.size() != 3u * 640 * 640)
         throw std::invalid_argument("invalid YOLO input size");
@@ -117,11 +156,13 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
 
     const char* output_names[] = {output_name_.c_str()};
 
+
     // 模块：推理执行：按名称绑定数据并测量同步Run调用
     //
     // Runtime（工厂管理系统）
     // Session（执行环境）
     // Run（开始生产）
+
 
     // 只计同步Run调用：不含输入张量包装、后面的输出复制及Detector预后处理。
     // CUDA路径还可能含EP管理的数据传输，这不是单独GPU kernel耗时，也未在本机验收。
@@ -134,7 +175,9 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
 
     last_latency_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
+
     // 模块：输出读取：检查Tensor形状并复制结果到自有数组
+
 
     if (outputs.empty()) {
         throw std::runtime_error("ONNX Runtime 没有返回输出。");
@@ -157,13 +200,17 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
     return std::vector<float>(output_data, output_data + output_count);
 }
 
+
 // 模块：计时查询：返回最近一次后端调用统计
+
 
 double OrtBackend::last_latency_ms() const {
     return last_latency_ms_;
 }
 
+
 // 模块：后端识别：返回当前实现的名称
+
 
 std::string OrtBackend::name() const {
     return "ONNX Runtime";

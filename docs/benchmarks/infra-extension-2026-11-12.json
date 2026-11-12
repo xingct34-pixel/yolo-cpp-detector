@@ -1,0 +1,78 @@
+{
+  "export-fp32": {
+    "exit": 0,
+    "peak_rss_kib": 149092,
+    "peak_swap_kib": 0,
+    "log": "export-fp32.log",
+    "detections": 134,
+    "scope": "real model export smoke only; no ground-truth accuracy measurement"
+  },
+  "export-int8": {
+    "exit": 0,
+    "peak_rss_kib": 142100,
+    "peak_swap_kib": 0,
+    "log": "export-int8.log",
+    "detections": 143,
+    "scope": "real model export smoke only; no ground-truth accuracy measurement"
+  },
+  "profile": {
+    "exit": 0,
+    "peak_rss_kib": 235268,
+    "peak_swap_kib": 0,
+    "log": "profile.log",
+    "operators": [
+      {
+        "op": "Conv",
+        "provider": "CPUExecutionProvider",
+        "calls": 880,
+        "duration_us": 303902.0
+      },
+      {
+        "op": "ReorderOutput",
+        "provider": "CPUExecutionProvider",
+        "calls": 910,
+        "duration_us": 96488.0
+      },
+      {
+        "op": "ReorderInput",
+        "provider": "CPUExecutionProvider",
+        "calls": 800,
+        "duration_us": 93201.0
+      },
+      {
+        "op": "QuickGelu",
+        "provider": "CPUExecutionProvider",
+        "calls": 770,
+        "duration_us": 76586.0
+      },
+      {
+        "op": "Concat",
+        "provider": "CPUExecutionProvider",
+        "calls": 210,
+        "duration_us": 46046.0
+      }
+    ],
+    "trace_events": 4122
+  },
+  "accuracy": {
+    "status": "not_verified",
+    "reason": "No independent labeled validation dataset supplied; no dataset downloaded and no ground truth fabricated"
+  },
+  "date": "2026-11-12",
+  "source_baseline": "9daa7f3dc27b35bef08c7b5a2d842b421488d09b",
+  "binaries": {
+    "build-local/yolo_detector": "7d4468b58a3a8989f47d8b1dbc4c9e9d90ca4ab14bac56f74e6f83eb35c1049e",
+    "build-local/yolo_coco_predict": "7e3a8dd5782378592b3c0953466492ce146336286d5afbad6004474fe02c720a"
+  },
+  "scope": "single local CPU experiment; no stable acceleration or generalization claim",
+  "tests": {
+    "release": {
+      "passed": 12,
+      "total": 12
+    },
+    "asan_ubsan": {
+      "passed": 11,
+      "total": 11
+    }
+  }
+}

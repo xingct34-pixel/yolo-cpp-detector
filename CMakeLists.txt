@@ -392,3 +392,21 @@ if(BUILD_TESTING)
         target_link_options(benchmark_test PRIVATE -fsanitize=address,undefined)
     endif()
 endif()
+
+
+# 模块：精度与算子诊断：标准库评估测试和复用现有CPU后端的COCO预测导出器
+
+
+add_executable(yolo_coco_predict tools/coco_predict.cpp src/ort_backend.cpp src/yolo_processing.cpp)
+target_include_directories(yolo_coco_predict PRIVATE include ${OpenCV_INCLUDE_DIRS} ${ONNXRUNTIME_INCLUDE_DIR})
+target_link_libraries(yolo_coco_predict PRIVATE ${OpenCV_LIBS} ${ONNXRUNTIME_LIBRARY} Threads::Threads)
+if(ENABLE_SANITIZERS)
+    target_compile_options(yolo_coco_predict PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(yolo_coco_predict PRIVATE -fsanitize=address,undefined)
+endif()
+if(BUILD_TESTING)
+    add_test(NAME detection_evaluation COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_evaluation.py)
+    set_tests_properties(detection_evaluation PROPERTIES TIMEOUT 20)
+    add_test(NAME ort_profile_summary COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_profile.py)
+    set_tests_properties(ort_profile_summary PROPERTIES TIMEOUT 20)
+endif()

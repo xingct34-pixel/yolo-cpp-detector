@@ -1,5 +1,7 @@
 # YOLO C++ Detector
 
+本轮增加[精度评估、C++预测导出和ORT算子分析](docs/精度评估与算子分析.md)，实测边界见[新增验收报告](docs/工程扩展验收-2026-11-12.md)。独立标注集上的真实mAP仍未验证。
+
 面向 CPU 的 C++17 目标检测部署工程：ONNX Runtime、OpenCV、Letterbox、按类别 NMS、有界视频流水线、可观测丢帧及性能报告。保留可选 GPU/TensorRT 实验代码，但当前稳定版本的验收范围是 CPU。
 
 ## 验证状态
