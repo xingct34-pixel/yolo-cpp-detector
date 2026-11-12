@@ -1,0 +1,3 @@
+# Project-local CPU evaluation only; no system installation.
+-r requirements-quantization.txt
+pycocotools==2.0.10

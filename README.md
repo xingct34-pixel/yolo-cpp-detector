@@ -1,5 +1,7 @@
 # YOLO C++ Detector
 
+后续已完成[COCO8小样本真实标注补验](docs/小样本精度补验-2026-11-12.md)，并与固定版本官方COCOeval交叉核对；4图结果不能代替大规模独立精度测试。
+
 本轮增加[精度评估、C++预测导出和ORT算子分析](docs/精度评估与算子分析.md)，实测边界见[新增验收报告](docs/工程扩展验收-2026-11-12.md)。独立标注集上的真实mAP仍未验证。
 
 面向 CPU 的 C++17 目标检测部署工程：ONNX Runtime、OpenCV、Letterbox、按类别 NMS、有界视频流水线、可观测丢帧及性能报告。保留可选 GPU/TensorRT 实验代码，但当前稳定版本的验收范围是 CPU。
@@ -97,3 +99,5 @@ build-local/yolo_detector --video test.mp4 --headless --mode sequential \
 ## 未验证边界
 
 GPU/CUDA provider、TensorRT 构建、FP16/INT8 精度与速度、摄像头、Windows 原生构建、大数据集 mAP 均未完成本轮验收。可选 TensorRT 代码属于实验路径，不包含在 CPU 成功声明内。第三方 SDK 和模型遵循各自许可证；本地模型的身份哈希不等于已证明其下载来源和导出过程。
+
+个人学习安排见[每日学习进度](docs/每日学习进度.md)：每天先YOLO后LLM，LLM个人学习从2026-11-13第1天开始。

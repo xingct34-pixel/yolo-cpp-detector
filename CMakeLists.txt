@@ -410,3 +410,12 @@ if(BUILD_TESTING)
     add_test(NAME ort_profile_summary COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_profile.py)
     set_tests_properties(ort_profile_summary PROPERTIES TIMEOUT 20)
 endif()
+
+
+# 模块：官方评估交叉验证：可选的项目Python环境，不触发下载或系统安装
+
+
+if(BUILD_TESTING AND YOLO_QUANT_PYTHON)
+    add_test(NAME coco_reference COMMAND ${YOLO_QUANT_PYTHON} ${PROJECT_SOURCE_DIR}/tests/test_coco_reference.py)
+    set_tests_properties(coco_reference PROPERTIES TIMEOUT 30 SKIP_RETURN_CODE 77)
+endif()

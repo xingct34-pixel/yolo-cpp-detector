@@ -1,0 +1,60 @@
+{
+  "dataset": "Ultralytics COCO8 val, four images sourced from COCO train2017",
+  "scope": "small labeled pipeline regression; not independent of model pretraining; no population accuracy claim",
+  "pycocotools": "2.0.10",
+  "validation_images": 4,
+  "ground_truth_boxes": 17,
+  "calibration_tensor_overlap": 0,
+  "validation_tensor_sha256": {
+    "000000000036.jpg": "3ecf9496f48fa4d861bb5e5d9cc6a87a0ee9fd3e07bef267d1049ac2045906ed",
+    "000000000042.jpg": "f82c1d31de32c423c6eb34aa39853c1263242896490b81f4bb3ad837765e40d6",
+    "000000000049.jpg": "1697b94d7b5288e038e6e1355596dc853c0d5aeafb2f9da7d5818b1d7a78cecd",
+    "000000000061.jpg": "c27d12967b111d712cbe3c9128cb60e6405ca2ea21429e5259277a46dd4e67ec"
+  },
+  "annotation_sha256": "8c5559458a323ace31383d916c9c7298922716e3534b703c22eaf644ff8003df",
+  "models": {
+    "fp32": {
+      "model_sha256": "128aa171b8f0172c6c65d65b94cb1cc9d4adb965e31514083f3004bd4e1f94cd",
+      "predictions": 217,
+      "reference_ap": {
+        "mAP50_95": 0.60385832000567,
+        "AP50": 0.855937974749856,
+        "AP75": 0.7153465346534653
+      },
+      "custom_ap": {
+        "mAP50_95": 0.60385832000567,
+        "AP50": 0.8559379747498559,
+        "AP75": 0.7153465346534653
+      },
+      "reference_difference": {
+        "mAP50_95": 0.0,
+        "AP50": 1.1102230246251565e-16,
+        "AP75": 0.0
+      }
+    },
+    "int8": {
+      "model_sha256": "a8a2685c9d5bbdf8afa762fbfee5b537637cf491b64ae8922f090b7450e25f12",
+      "predictions": 213,
+      "reference_ap": {
+        "mAP50_95": 0.6231455288385981,
+        "AP50": 0.9304180418041803,
+        "AP75": 0.572017916077322
+      },
+      "custom_ap": {
+        "mAP50_95": 0.6231455288385982,
+        "AP50": 0.9304180418041804,
+        "AP75": 0.572017916077322
+      },
+      "reference_difference": {
+        "mAP50_95": 1.1102230246251565e-16,
+        "AP50": 1.1102230246251565e-16,
+        "AP75": 0.0
+      }
+    }
+  },
+  "int8_minus_fp32": {
+    "AP50": 0.0744800670543243,
+    "AP75": -0.14332861857614332,
+    "mAP50_95": 0.019287208832928115
+  }
+}

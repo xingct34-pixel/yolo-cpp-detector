@@ -1,0 +1,21 @@
+{
+  "coco8.zip": {
+    "url": "https://github.com/ultralytics/assets/releases/download/v0.0.0/coco8.zip",
+    "bytes": 443158,
+    "sha256": "54c67fe9ef88313e021ec0e92b73c200167bb0a86633e8df8658d832cca828c9",
+    "official_published_sha256": null
+  },
+  "pycocotools-2.0.10-cp312-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl": {
+    "url": "https://files.pythonhosted.org/packages/49/80/912b4c60f94e747dd2c3adbda5d4a4edc1d735fbfa0d91ab2eb231decb5d/pycocotools-2.0.10-cp312-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "bytes": 397099,
+    "sha256": "4539d8b29230de042f574012edd0b5227528da083c4f12bbd6488567aabd3920",
+    "official_published_sha256": "4539d8b29230de042f574012edd0b5227528da083c4f12bbd6488567aabd3920"
+  },
+  "pycocotools_metadata": {
+    "version": "2.0.10",
+    "license": "FreeBSD",
+    "source": {
+      "Homepage": "https://github.com/ppwwyyxx/cocoapi"
+    }
+  }
+}

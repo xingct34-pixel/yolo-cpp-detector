@@ -77,10 +77,11 @@ def class_ap(ground_truth, predictions, threshold):
     for index in range(len(points) - 1, -1, -1):
         peak = max(peak, points[index][1])
         precision_envelope[index] = peak
+    # 与官方linspace网格一致：0.70可能表示0.7000000000000001；不要用epsilon改变查找位置。
     values = []
     cursor = 0
     for step in range(101):
-        while cursor < len(points) and points[cursor][0] + 1e-12 < step / 100:
+        while cursor < len(points) and points[cursor][0] < step * (1.0 / 100):
             cursor += 1
         values.append(precision_envelope[cursor] if cursor < len(points) else 0.0)
     return sum(values) / 101
@@ -94,7 +95,7 @@ def evaluate(dataset, predictions):
     categories = sorted({a['category_id'] for a in dataset['annotations']})
     if not categories:
         raise ValueError('at least one ground-truth box is required')
-    thresholds = [0.5 + 0.05 * i for i in range(10)]
+    thresholds = [0.5 + ((0.95 - 0.5) / 9) * i for i in range(10)]
     by_class = {}
     for category in categories:
         gt = [a for a in dataset['annotations'] if a['category_id'] == category]
@@ -102,7 +103,7 @@ def evaluate(dataset, predictions):
         by_class[str(category)] = [class_ap(gt, pred, t) for t in thresholds]
     ap = [sum(row[i] for row in by_class.values()) / len(categories) for i in range(10)]
     return {
-        'evaluator': 'bbox-101point-noncrowd-v1',
+        'evaluator': 'bbox-101point-noncrowd-v2',
         'AP50': ap[0],
         'AP75': ap[5],
         'mAP50_95': sum(ap) / len(ap),
