@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""Dependency-free bbox AP evaluator for non-crowd COCO-format annotations."""
+
+
 import argparse
 import hashlib
 import json
