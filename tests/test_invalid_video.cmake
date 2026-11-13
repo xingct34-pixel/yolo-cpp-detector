@@ -1,3 +1,8 @@
+# YOLO 检测部署 | tests/test_invalid_video.cmake
+# 给检测程序一个明确不存在的视频路径，检查退出码和报错里是否含有这个路径。
+# 这让 CTest 可以区分“成功报告读视频失败”和“程序在更早的地方意外退出”。
+
+
 if(NOT DEFINED YOLO_EXECUTABLE OR
    NOT DEFINED ORT_LIBRARY_DIR OR
    NOT DEFINED PROJECT_ROOT)
@@ -28,6 +33,11 @@ if(DEFINED ENV{LD_LIBRARY_PATH} AND
    NOT "$ENV{LD_LIBRARY_PATH}" STREQUAL "")
     string(APPEND runtime_library_path ":$ENV{LD_LIBRARY_PATH}")
 endif()
+
+
+# 模块：触发读视频错误
+# 模型和类别表准备好之后才传入缺失的视频，避免被更早的错误挡住。
+
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env

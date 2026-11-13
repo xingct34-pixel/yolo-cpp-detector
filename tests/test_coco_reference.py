@@ -1,3 +1,8 @@
+# YOLO 检测部署 | tests/test_coco_reference.py
+# 用固定随机种子生成预测，再把同一份标注与预测交给两个评估器。
+# 对照 pycocotools 检查排序同分、每图预测数量限制等容易让 AP 悄悄变化的情况。
+
+
 """Optional project-local comparison against pinned official pycocotools."""
 
 import importlib.util

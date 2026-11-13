@@ -1,36 +1,52 @@
-这是一个YOLO 目标检测模型（ONNX 格式）的 INT8 量化实验工具。它把 FP32 模型转成 INT8 模型，并自动对比两者的体积、速度和输出差异，最后生成一份报告。
+# YOLO 检测部署 | tools/cpu_quantize.py
+# 离线比较 YOLO 的 FP32 和静态 INT8 模型。前一组视频帧用于校准，后一组用于比较。
+# 同一输入分别跑两个模型，报告文件大小、推理时间和原始张量偏差。
+# 要了解框有没有检对，接着看 validate_coco8.py 的带标注评估。
 
-整体流程
 
-步骤 1｜读视频取帧：从视频里连续读出 16 帧（默认 8 帧校准 + 8 帧评估），两组帧编号互不重叠。
+# 这是一个YOLO 目标检测模型（ONNX 格式）的 INT8 量化实验工具。
+# 它把 FP32 模型转成 INT8 模型，并自动对比两者的体积、速度和输出差异，
+# 最后生成一份报告。
 
-步骤 2｜预处理：每帧按 YOLO 常用方式处理，即等比缩放到 640×640、不足处用灰色（114）居中填充、BGR 转 RGB、像素除以 255、排成 NCHW 格式。注释里说明这与 C++ 端的 prepare_yolo 保持一致，保证 Python 测的和实际部署用的是同一种输入。
+# 整体流程
 
-步骤 3｜检查原模型接口：必须是单输入单输出，输入 [1,3,640,640]，输出 [1,84,8400]（YOLOv8 的标准输出格式）。
+# 步骤 1｜读视频取帧：从视频里连续读出 16 帧（默认 8 帧校准 + 8 帧评估），两组帧编号互不重叠。
 
-步骤 4｜量化：用前 8 帧做校准，生成 QDQ 格式的静态 INT8 模型。
+# 步骤 2｜预处理：每帧按 YOLO 常用方式处理，即等比缩放到 640×640、不足处用灰色（114）
+# 居中填充、BGR 转 RGB、像素除以 255、排成 NCHW 格式。
+# 注释里说明这与 C++ 端的 prepare_yolo 保持一致，
+# 保证 Python 测的和实际部署用的是同一种输入。
 
-步骤 5｜验证量化是否生效：检查模型合法、有 QDQ 节点、接口没变。
+# 步骤 3｜检查原模型接口：必须是单输入单输出，输入 [1,3,640,640]，
+# 输出 [1,84,8400]（本项目所用 YOLO11n 导出模型的接口）。
 
-步骤 6｜对比测试：用后 8 帧，让 FP32 和 INT8 各跑若干轮：
+# 步骤 4｜量化：用前 8 帧做校准，生成 QDQ 格式的静态 INT8 模型。
 
-速度：记录每次推理耗时，取中位数
-精度：计算两者输出的差异（MAE、RMSE、类别分数 MAE）
-健壮性：输出形状错误或出现 NaN/Inf 就报错
+# 步骤 5｜验证量化是否生效：检查模型合法、有 QDQ 节点、接口没变。
 
-步骤 7｜写报告：无论成功或失败，都写出 report.json，终端再打印摘要。
+# 步骤 6｜对比测试：用后 8 帧，让 FP32 和 INT8 各跑若干轮：
 
-几个值得注意的设计
-只在 CPU 上测，线程数默认 3，上限 6。
-输出目录必须是新的，已存在就拒绝，防止覆盖之前的实验证据。
-可追溯：报告里记录了模型、视频、每帧张量的 SHA-256，以及各库版本，方便以后复现。
-会检测数据泄漏：如果校准帧和评估帧里有内容完全相同的张量（比如视频里有静止画面），会在报告里发出警告。
-诚实标注局限：报告里明确写了 accuracy_map: None，说明这是用无标注的相邻视频帧做的数值冒烟测试，不是真正的精度（mAP）评估。它只能说明"INT8 和 FP32 的输出差得多不多"，不能说明检测效果掉了多少。
-计时口径说明：只计 Session.run，不含预处理和排队，避免被误解为端到端延迟。
+# 速度：记录每次推理耗时，取中位数
+# 数值偏差：计算两者输出的差异（MAE、RMSE、类别分数 MAE）
+# 健壮性：输出形状错误或出现 NaN/Inf 就报错
 
+# 步骤 7｜写报告：进入实验主体后会尝试写出 report.json；参数解析或建目录失败会更早退出。
+
+# 几个值得注意的设计
+# 只在 CPU 上测，线程数默认 3，上限 6。
+# 输出目录必须是新的，已存在就拒绝，防止覆盖之前的实验证据。
+# 可追溯：报告里记录了模型、视频、每帧张量的 SHA-256，以及各库版本，方便以后复现。
+# 会检查完全重复的输入：如果校准帧和评估帧里有内容完全相同的张量（比如视频里有静止画面），会在报告里发出警告。
+# 诚实标注局限：报告里明确写了 accuracy_map: None，
+# 说明这是用无标注的相邻视频帧做的数值冒烟测试，不是真正的精度（mAP）评估。
+# 它只能说明"INT8 和 FP32 的输出差得多不多"，
+# 不能说明检测效果掉了多少。
+# 计时口径说明：只计 Session.run，不含预处理和排队，避免被误解为端到端延迟。
 
 
 # 模块：CPU量化工具：校准、静态INT8转换及正确性/性能对比
+
+
 """CPU INT8 QDQ experiment using disjoint video frames. No implicit downloads."""
 import argparse
 import hashlib
@@ -49,6 +65,8 @@ from onnxruntime.quantization.shape_inference import quant_pre_process
 
 
 # 模块：文件校验：分块计算SHA-256
+
+
 def sha256(path):
     digest = hashlib.sha256()
     with Path(path).open('rb') as handle:
@@ -58,6 +76,8 @@ def sha256(path):
 
 
 # 模块：图像预处理：生成与C++输入约定一致的校准数据
+
+
 def prepare(image):
     """Match prepare_yolo: round positive dimensions, center padding, RGB NCHW."""
     if image is None or image.dtype != np.uint8 or image.ndim != 3 or image.shape[2] != 3:
@@ -84,6 +104,8 @@ def prepare(image):
 
 
 # 模块：校准数据接口：按批提供已经准备好的输入
+
+
 class Reader(CalibrationDataReader):
     def __init__(self, name, tensors):
         self.name = name
@@ -99,6 +121,8 @@ class Reader(CalibrationDataReader):
 
 
 # 模块：推理会话：建立CPU执行会话
+
+
 def session(path, threads):
     options = ort.SessionOptions()
     options.intra_op_num_threads = threads
@@ -106,6 +130,8 @@ def session(path, threads):
 
 
 # 模块：模型约定检查：验证输入输出类型和形状
+
+
 def check_contract(engine):
     # 获取模型的全部输入和输出节点信息
     inputs, outputs = engine.get_inputs(), engine.get_outputs()
@@ -124,6 +150,8 @@ def check_contract(engine):
 
 
 # 模块：执行入口：读取参数并组织该工具的完整流程
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', type=Path, required=True)
@@ -211,12 +239,12 @@ def main():
             activation_type=QuantType.QInt8,  # 激活值（层与层之间传递的数据）用有符号 8 位整数
             weight_type=QuantType.QInt8,      # 权重（模型学到的参数）用有符号 8 位整数
             # 按通道量化：每个卷积输出通道各用一把自己的刻度尺，而不是整层共用一把。
-            # 通俗讲：不同通道数值大小差别很大，各配各的尺子，精度损失更小。
+            # 通俗讲：不同通道数值大小差别很大，各配各的尺子，有助于减小数值偏差，实际效果由测量判断。
             per_channel=True,
             # 把 8 位范围缩成 7 位使用。主要是为了避免部分 CPU 指令在整数相乘累加时溢出，
             # 代价是精度略降。如果目标 CPU 支持 VNNI 等新指令，可以考虑关掉。
             reduce_range=True,
-            # 只量化卷积和矩阵乘法，这两类算子占了绝大部分计算量，收益最大；其余算子保持 FP32，保护精度
+            # 只量化卷积和矩阵乘法，其余类型未列入量化目标；运行速度和精度需要分别测量
             op_types_to_quantize=['Conv', 'MatMul'],
         )
         # 检查量化后的模型是否是合法的 ONNX 模型（结构、类型、版本等）
@@ -308,7 +336,7 @@ def main():
         report['error'] = f'{type(error).__name__}: {error}'
         raise
     finally:
-        # finally 无论成功还是报错都会执行，保证任何情况下都会落盘一份 report.json，
+        # finally 无论成功还是报错都会执行，尝试将实验主体的执行结果写入 report.json，
         # 失败时报告里就有 error 字段，方便排查
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     # 在终端打印精简摘要：是否通过、模型大小对比、延迟对比，完整细节看 report.json

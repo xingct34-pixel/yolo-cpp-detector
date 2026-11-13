@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# YOLO 检测部署 | tools/evaluate_detection.py
+# 读取标注框和预测框，为每个类别按置信度从高到低匹配，累计精确率与召回率。
+# IoU 门槛决定两个框能否配对，在多个门槛上计算 AP 后汇总成报告。
+# 该实现面向普通 bbox 标注；validate_coco8.py 另用官方工具复核同一批结果。
+
+
+"""Dependency-free bbox AP evaluator for non-crowd COCO-format annotations."""
 
 
 import argparse

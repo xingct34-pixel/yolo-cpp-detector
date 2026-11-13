@@ -1,3 +1,9 @@
+# YOLO 检测部署 | CMakeLists.txt
+# CMake 用本文件把源文件、头文件和推理库连成可执行程序及测试目标。
+# 先看 ONNXRUNTIME_ROOT 怎样定位头文件与动态库，再看 yolo_detector 组合了哪些 .cpp；
+# TensorRT 工具和部分 Python 验收由相应构建选项决定是否加入。
+
+
 cmake_minimum_required(VERSION 3.18)
 
 project(yolo_cpp_detector)
@@ -78,6 +84,11 @@ find_library(
 # ============================================================
 # 主程序：YOLO Detector
 # ============================================================
+
+
+# 模块：核心源文件
+# 图片与视频共用这组实现，选中 TensorRT 时才追加对应源文件。
+
 
 set(APP_SOURCES
 
@@ -294,6 +305,11 @@ message(STATUS "")
 # ============================================================
 
 include(CTest)
+
+
+# 模块：可选 Python 测试
+# 把安装了量化依赖的解释器显式交给 CTest，才能实际导入 ORT 等库。
+
 
 set(YOLO_QUANT_PYTHON "" CACHE FILEPATH "Optional Python interpreter with requirements-quantization.txt")
 if(BUILD_TESTING AND YOLO_QUANT_PYTHON)

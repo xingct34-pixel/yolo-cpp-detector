@@ -1,3 +1,8 @@
+# YOLO 检测部署 | .github/workflows/ci.yml
+# 提交代码后，GitHub 的 Linux runner 编译运行队列与 Benchmark 的小测试，
+# 再执行 AP 和 Profile 的 Python 测试。这组快速检查只需要合成数据。
+
+
 name: Portable core checks
 on: [push, pull_request]
 permissions:

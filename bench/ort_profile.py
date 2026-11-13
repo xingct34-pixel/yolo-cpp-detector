@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# YOLO 检测部署 | bench/ort_profile.py
+# 离线读取 ONNX Runtime 写出的 Profile 时间线，按算子和执行后端累加 kernel_time。
+# 同一个运行里还含会话与其他事件；只挑节点执行事件，才不会把嵌套耗时重复相加。
+
+
 """Summarize an existing ORT JSON profile; node sums are not end-to-end latency."""
 import argparse
 import collections

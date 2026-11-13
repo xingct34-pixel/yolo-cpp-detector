@@ -1,3 +1,8 @@
+// YOLO 检测部署 | tests/test_thread_safe_queue.cpp
+// 用整数代替视频帧检验线程队列。容量 2 依次压入 1、2、3，可以直接看出丢了谁；
+// 再安排线程等在空队列或满队列上，检查 close 能否唤醒它们以及剩余数据是否可取。
+
+
 #include "thread_safe_queue.h"
 
 #include <atomic>
@@ -65,6 +70,10 @@ int main()
     assert(drain_queue.pop(item) && item == 42);
     assert(!drain_queue.pop(item));
     std::cout << "[通过] 关闭队列可排空已有数据\n";
+
+
+    // 模块：满队列上的退出
+    // 先占满唯一空位让生产者等待，再 close，检查它能否退出。
 
 
     ThreadSafeQueue<int> blocking(1,QueuePolicy::Block);

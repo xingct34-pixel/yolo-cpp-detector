@@ -1,3 +1,9 @@
+// YOLO 检测部署 | src/benchmark.cpp
+// 把许多次单帧计时变成一份分布报告。均值使用整个运行期的总和与次数；
+// 分位数只对保留的近期样本排序，再在相邻位置之间按距离加权。
+// 例如保留窗口已满时，最旧的一帧会退出分位统计，它依然计入全程均值。
+
+
 #include "benchmark.h"
 
 #include <algorithm>
@@ -6,7 +12,10 @@
 #include <iostream>
 #include <stdexcept>
 
+
 // 模块：样本记录：累计全程指标并维护有界分位样本
+
+
 void Benchmark::record(double latency_ms) {
     if (latency_ms < 0.0 || !std::isfinite(latency_ms)) {
         return;
@@ -25,7 +34,10 @@ void Benchmark::record(double latency_ms) {
         latencies_[next_++ % 10000] = latency_ms;
 }
 
+
 // 模块：统计计算：提供均值、插值分位、极值和样本数量
+
+
 double Benchmark::average() const {
     return total_count_ ? sum_ / total_count_ : 0;
 }
@@ -79,7 +91,10 @@ size_t Benchmark::count() const {
     return total_count_;
 }
 
+
 // 模块：指标展示：打印当前阶段的延迟分布和耗时倒数
+
+
 void Benchmark::print(const char* name) const {
     std::cout << "\n========== Benchmark ==========" << std::endl;
 

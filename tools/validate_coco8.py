@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# YOLO 检测部署 | tools/validate_coco8.py
+# 一次小样本回归的入口。它把已有数据集的标签换算成原图坐标，分别调用
+# yolo_coco_predict 导出两个模型的预测，再用项目评估器和官方 COCOeval 交叉核对。
+# 先看 main 里的文件流向，再看 convert 如何把归一化框换成像素。
+
+
+"""Small labeled CPU regression using externally prepared official COCO8 data, never a full COCO result."""
 
 
 
@@ -26,6 +34,8 @@ from tools.evaluate_detection import evaluate
 # 作用：把外部准备好的 COCO8 验证集（4 张图片 + YOLO 格式标注）转成 COCO 标注格式，
 #       供后面的 AP 评估使用。只读本地文件，不下载、不伪造真值。
 # 通俗讲：YOLO 和 COCO 是两种"标注记账方式"，评估工具只认 COCO 的，所以要翻译一遍。
+
+
 def convert(dataset, names):
     # images：图片信息列表；annotations：标注框列表；hashes：每张图预处理后的指纹
     images, annotations, hashes = [], [], {}
@@ -85,6 +95,8 @@ def convert(dataset, names):
 # 作用：用固定版本的官方 pycocotools 对同一份预测结果计算 AP，
 #       作为"标准答案"，用来检验项目自己写的评估函数算得对不对。
 # 通俗讲：自己写的评分程序可能有 bug，所以再找官方评分程序算一遍，两边分数一致才放心。
+
+
 def official_ap(dataset, predictions):
     # 没有任何预测框时官方工具会报错，这种情况直接定义为 AP 全为 0
     if not predictions:
@@ -114,6 +126,8 @@ def official_ap(dataset, predictions):
 # 作用：串起整个测试：转换标注 → 校验数据和模型身份 → 用 C++ 程序分别跑 FP32 和 INT8 模型出预测 →
 #       计算 AP 并和官方结果交叉验证 → 汇总 INT8 相对 FP32 的精度变化，写入 report.json。
 # 通俗讲：这是"量化之后检测效果到底掉了多少"的小型验收考试。
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dataset', type=Path, required=True)  # COCO8 数据集目录
@@ -213,5 +227,7 @@ def main():
 
 # 模块：脚本入口
 # 作用：只有直接运行本文件时才执行 main()；被其他文件 import 时不会自动运行。
+
+
 if __name__ == '__main__':
     main()

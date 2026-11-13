@@ -1,3 +1,8 @@
+# YOLO 检测部署 | tests/real_cpu.py
+# 用本机的真实 ONNX 和视频调用已编译的检测程序，检查顺序、流水线、丢帧和单图路径。
+# 例如读入帧数应等于推理帧数加输入丢帧数；最后还向测试子进程发送 SIGINT 验证退出。
+
+
 from pathlib import Path
 import subprocess,json,os,hashlib,tempfile,signal,time
 r=Path(__file__).resolve().parents[1];out=r/'results';out.mkdir(exist_ok=True);exe=r/'build-local/yolo_detector'
@@ -7,11 +12,23 @@ def run(name,args,timeout=180):
     with (out/(name+'.log')).open('w') as log:p=subprocess.run(base+args,cwd=r,stdout=log,stderr=subprocess.STDOUT,timeout=timeout)
     if p.returncode:raise RuntimeError(name+': '+(out/(name+'.log')).read_text()[-2000:])
     print(name,'passed',flush=True)
+
+
+# 模块：核对完整处理
+# 顺序和流水线输入同样多的帧，阻塞模式下三段计数应一致。
+
+
 for mode in ['sequential','pipeline']:
     name='real-'+mode
     run(name,['--video','test.mp4','--mode',mode,'--max-frames','30','--queue-size','2','--report',str(out/(name+'.json'))])
     d=json.loads((out/(name+'.json')).read_text());assert d['read_frames']==d['inferred_frames']==d['output_frames']==30
     assert d['input_dropped']==d['result_dropped']==0;records.append(d)
+
+
+# 模块：核对被丢弃的帧
+# 把两个队列分别算账，哪条队列丢了帧，差值就应出现在它自己的计数里。
+
+
 run('real-drop',['--video','test.mp4','--queue-policy','drop-oldest','--queue-size','1','--report',str(out/'real-drop.json')])
 d=json.loads((out/'real-drop.json').read_text());assert d['read_frames']==d['inferred_frames']+d['input_dropped'];assert d['inferred_frames']==d['output_frames']+d['result_dropped'];records.append(d)
 with tempfile.TemporaryDirectory() as folder:

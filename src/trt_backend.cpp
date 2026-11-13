@@ -1,3 +1,9 @@
+// YOLO 检测部署 | src/trt_backend.cpp
+// 这条可选 GPU 路径读取提前生成的 TensorRT engine。构造时分配缓冲并绑定地址，
+// 每帧把输入从主机复制到显存、提交推理，再把输出送回主机给 Detector。
+// 对应头文件为 trt_backend.h。实际速度和可用精度需要在兼容设备上测量。
+
+
 #include "trt_backend.h"
 
 #include <cuda_runtime_api.h>
@@ -8,7 +14,9 @@
 #include <stdexcept>
 #include <vector>
 
+
 // 模块：TensorRT日志：输出后端警告和错误
+
 
 void TrtLogger::log(Severity severity, const char* msg) noexcept {
     if (severity <= Severity::kWARNING) {
@@ -16,7 +24,9 @@ void TrtLogger::log(Severity severity, const char* msg) noexcept {
     }
 }
 
+
 // 模块：工具函数：计算固定形状的元素总数
+
 
 namespace {
 
@@ -37,18 +47,27 @@ size_t getElementCount(const nvinfer1::Dims& dims) {
 
 }
 
+
 // 模块：构造初始化：准备后端执行所需的资源
 
+
 TrtBackend::TrtBackend(const std::string& engine_path) {
+
+
     // 模块：Engine 加载
+
 
     loadEngine(engine_path);
 
+
     // 模块：Tensor 信息
+
 
     inspectTensors();
 
+
     // 模块：CUDA Stream
+
 
     cudaError_t err = cudaStreamCreate(&stream_);
 
@@ -57,21 +76,27 @@ TrtBackend::TrtBackend(const std::string& engine_path) {
                                  std::string(cudaGetErrorString(err)));
     }
 
+
     // 模块：CUDA Buffer
 
+
     allocateBuffers();
+
 
     // 模块：Tensor 地址绑定
     //
     // 把 TensorRT 的输入输出 Tensor
     // 连接到我们申请的 GPU Buffer。
 
+
     context_->setTensorAddress(input_name_.c_str(), device_input_);
 
     context_->setTensorAddress(output_name_.c_str(), device_output_);
 }
 
+
 // 模块：资源回收：释放GPU缓冲和执行流
+
 
 TrtBackend::~TrtBackend() {
     releaseBuffers();
@@ -83,7 +108,9 @@ TrtBackend::~TrtBackend() {
     }
 }
 
+
 // 模块：Engine加载：读取执行计划并创建Runtime和Context
+
 
 void TrtBackend::loadEngine(const std::string& engine_path) {
     std::ifstream file(engine_path, std::ios::binary);
@@ -126,7 +153,9 @@ void TrtBackend::loadEngine(const std::string& engine_path) {
     }
 }
 
+
 // 模块：Tensor信息：保存输入输出的名称、形状和元素数量
+
 
 void TrtBackend::inspectTensors() {
     const int tensor_count = engine_->getNbIOTensors();
@@ -170,7 +199,9 @@ void TrtBackend::inspectTensors() {
     std::cout << "TensorRT 输出 Tensor: " << output_name_ << std::endl;
 }
 
+
 // 模块：CUDA 内存管理模块
+
 
 void TrtBackend::allocateBuffers() {
     cudaError_t err;
@@ -210,7 +241,9 @@ void TrtBackend::releaseBuffers() {
     }
 }
 
+
 // 模块：TensorRT 推理模块
+
 
 std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
     if (input_data.size() != input_elements_) {
@@ -219,10 +252,12 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
 
     std::vector<float> output(output_elements_);
 
+
     // 模块：H2D
     //
     // H2D（仓库 → 工厂）
     // CPU 内存 → GPU 显存
+
 
     cudaError_t err = cudaMemcpyAsync(device_input_,
                                       input_data.data(),
@@ -234,11 +269,13 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
         throw std::runtime_error("H2D failed: " + std::string(cudaGetErrorString(err)));
     }
 
+
     // 模块：TensorRT 执行
     //
     // Engine（生产线）
     // Context（本次任务）
     // Stream（传送带）
+
 
     auto start = std::chrono::steady_clock::now();
 
@@ -258,10 +295,12 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
 
     last_latency_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
+
     // 模块：D2H
     //
     // D2H（工厂 → 仓库）
     // GPU 显存 → CPU 内存
+
 
     err = cudaMemcpyAsync(output.data(),
                           device_output_,
@@ -282,13 +321,17 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
     return output;
 }
 
+
 // 模块：计时查询：返回最近一次后端调用统计
+
 
 double TrtBackend::last_latency_ms() const {
     return last_latency_ms_;
 }
 
+
 // 模块：后端识别：返回当前实现的名称
+
 
 std::string TrtBackend::name() const {
     return "TensorRT";

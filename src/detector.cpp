@@ -1,3 +1,9 @@
+// YOLO 检测部署 | src/detector.cpp
+// 图片模式和视频模式最后都会走到这里。构造 Detector 时读类别表并创建推理后端；
+// 每次 detect 只处理一帧，依次准备浮点输入、执行模型、解码框、在图片副本上绘制。
+// 要看像素怎样变成张量，顺着 prepare_yolo 进入 yolo_processing.cpp。
+
+
 #include "detector.h"
 #include "ort_backend.h"
 #ifdef ENABLE_TENSORRT
@@ -7,7 +13,10 @@
 #include <fstream>
 #include <stdexcept>
 
+
 // 模块：计时辅助：把两个时间点的差转换成毫秒
+
+
 namespace {
 using Clock = std::chrono::steady_clock;
 
@@ -16,8 +25,11 @@ double ms(Clock::time_point a, Clock::time_point b) {
 }
 }
 
+
 // 模块：模型初始化：读取类别名称并创建选定后端
 // 构造时读取类别名并创建后端；同一Detector处理后续各帧时复用已加载的模型。
+
+
 Detector::Detector(const std::string& model,
                    const std::string& classes,
                    BackendType type,
@@ -47,24 +59,36 @@ Detector::Detector(const std::string& model,
     }
 }
 
+
 // 模块：单帧检测：串联预处理、推理、后处理与绘图
 // 单帧主线：原图副本用于绘制，input浮点数组用于推理，两者用途不同。
 // info贯穿预处理和后处理，output是模型原始数字，返回值才是画好框的BGR图片。
+
+
 cv::Mat Detector::detect(const cv::Mat& image) {
     auto begin = Clock::now();
     auto result = image.clone();
     auto cloned = Clock::now();
 
+
     // 模块：1. 输入准备：保存几何变换并生成模型输入
+
+
     LetterboxInfo info;
     auto input = prepare_yolo(image, info, times_);
     auto prepared = Clock::now();
 
+
     // 模块：2. 后端执行：复用已加载模型获取原始输出
+
+
     auto output = backend_->infer(input);
     auto inferred = Clock::now();
 
+
     // 模块：3. 结果处理：解析检测框并画到图片副本上
+
+
     detections_ = decode_yolo(output, image.size(), info);
     draw_detections(result, detections_, names_);
     auto end = Clock::now();

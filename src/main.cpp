@@ -1,3 +1,9 @@
+// YOLO 检测部署 | src/main.cpp
+// 运行 yolo_detector 时从 main 开始。它读命令行，决定这次处理一张图片还是一段视频。
+// 图片直接交给 Detector；视频交给 Pipeline，后者会反复调用同一个 Detector。
+// 读代码时可以跟着 --image 看一遍，找到第一张画好检测框的图片在哪里保存。
+
+
 #include "pipeline.h"
 #include <opencv2/imgcodecs.hpp>
 #include <csignal>
@@ -5,7 +11,10 @@
 #include <limits>
 #include <stdexcept>
 
+
 // 模块：启动辅助：处理退出信号并校验整数参数
+
+
 namespace {
 std::atomic<bool> interrupted{false};
 static_assert(std::atomic<bool>::is_always_lock_free, "signal flag must be lock free");
@@ -29,12 +38,18 @@ int integer(const std::string& text, const std::string& key, int low, int high) 
 }
 }
 
+
 // 模块：程序入口：解析参数，选择图片或视频处理流程
 // 入口只负责参数校验、选择图片/视频路径及统一异常出口；检测算法留给Detector。
+
+
 int main(int argc, char** argv) {
     try {
 
+
         // 模块：1. 参数配置：设置默认值并解析命令行
+
+
         std::string video = "test.mp4", image, output, model = "models/yolo11n.onnx",
                     classes = "data/coco.txt", engine = "models/yolo11n.engine";
         auto type = Detector::BackendType::ORT;
@@ -112,13 +127,20 @@ int main(int argc, char** argv) {
             } else
                 throw std::invalid_argument("unknown argument: " + key);
         }
+
+
         // 模块：2. 退出通知：把信号标志交给视频流水线
         // 信号回调只置原子标志；视频Pipeline的监视线程再正常关闭队列，回调中不做复杂清理。
+
+
         std::signal(SIGINT, stop);
         std::signal(SIGTERM, stop);
         options.external_stop = &interrupted;
 
+
         // 模块：3. 图片模式：读取图片、检测、保存图片及可选报告
+
+
         if (!image.empty()) {
             if (output.empty())
                 throw std::invalid_argument("--image requires --output");
@@ -142,7 +164,11 @@ int main(int argc, char** argv) {
                 fs << "]" << "inference_ms" << detector.last_inference_ms();
             }
         } else {
+
+
             // 模块：4. 视频模式：构造流水线并开始处理
+
+
             Pipeline pipeline(video, model, classes, type, engine, cuda, capacity, options);
             pipeline.run();
         }

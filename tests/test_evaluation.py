@@ -1,3 +1,8 @@
+# YOLO 检测部署 | tests/test_evaluation.py
+# 为 evaluate_detection.py 准备有已知答案的小样本。一个真值配一个完全重合的正确框，
+# 与漏检、重复预测或错分类别比较，可以单独判断匹配和召回率计算有无偏差。
+
+
 import copy
 import importlib.util
 from pathlib import Path

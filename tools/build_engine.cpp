@@ -1,3 +1,8 @@
+// YOLO 检测部署 | tools/build_engine.cpp
+// 离线把 ONNX 网络转换成 TensorRT 可加载的执行计划。输入包含模型路径、精度和构建选项；
+// 选用需要校准的 INT8 路径时，由 int8_calibrator 提供代表性图片。
+// 序列化后的文件才会交给 TrtBackend。构建与逐帧推理发生在不同阶段。
+
 
 #include "int8_calibrator.h"
 
@@ -13,7 +18,10 @@
 #include <stdexcept>
 #include <string>
 
+
 // 模块：构建日志：输出TensorRT警告及错误（实验路径）
+
+
 class BuildLogger : public nvinfer1::ILogger {
 public:
     void log(Severity severity, const char* msg) noexcept override {
@@ -23,7 +31,10 @@ public:
     }
 };
 
+
 // 模块：构建配置：记录模型、精度、校准数据与工作空间
+
+
 struct BuildConfig {
     std::string onnx_path;
     std::string engine_path;
@@ -40,7 +51,10 @@ struct BuildConfig {
     size_t workspace_gb = 2;
 };
 
+
 // 模块：帮助输出：说明Engine构建工具的命令行参数
+
+
 static void printUsage(const char* program) {
     std::cout << "\n用法:\n"
               << "  " << program << " --onnx <model.onnx>"
@@ -58,7 +72,10 @@ static void printUsage(const char* program) {
               << "  --help                 显示帮助\n\n";
 }
 
+
 // 模块：参数解析：读取并校验构建所需选项
+
+
 static BuildConfig parseArguments(int argc, char* argv[]) {
     BuildConfig config;
 
@@ -113,8 +130,11 @@ static BuildConfig parseArguments(int argc, char* argv[]) {
     return config;
 }
 
+
 // 模块：产物保存：把序列化Engine写入目标文件
 // 将构建后的 Engine（二进制推理执行计划）保存到磁盘。
+
+
 static void saveEngine(const std::string& path, const nvinfer1::IHostMemory& serialized) {
     const std::filesystem::path output_path(path);
 
@@ -136,7 +156,10 @@ static void saveEngine(const std::string& path, const nvinfer1::IHostMemory& ser
     }
 }
 
+
 // 模块：构建入口：解析ONNX，配置精度并生成Engine（未在本机验收）
+
+
 int main(int argc, char* argv[]) {
     try {
         const BuildConfig config = parseArguments(argc, argv);

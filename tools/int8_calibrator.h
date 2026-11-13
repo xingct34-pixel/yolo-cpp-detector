@@ -1,3 +1,8 @@
+// YOLO 检测部署 | tools/int8_calibrator.h
+// TensorRT 构建工具通过这个接口向校准器索取成批输入，也可以读写校准缓存。
+// 构建器决定何时要下一批，具体怎样找图、预处理和送入显存在同名 .cpp 中。
+
+
 #pragma once
 
 #include <NvInfer.h>
@@ -7,7 +12,10 @@
 #include <string>
 #include <vector>
 
+
 // 模块：校准器接口：为TensorRT提供输入批次及校准缓存（实验路径）
+
+
 class YoloInt8Calibrator : public nvinfer1::IInt8EntropyCalibrator2 {
 public:
     YoloInt8Calibrator(const std::string& image_dir,

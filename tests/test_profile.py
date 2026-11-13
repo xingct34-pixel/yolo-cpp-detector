@@ -1,3 +1,8 @@
+# YOLO 检测部署 | tests/test_profile.py
+# 构造短小的 ORT 时间线，交给 bench/ort_profile.py 的 summarize 汇总。
+# 把同类算子放在不同后端，并混入其他事件，检验报告会正确分组和筛选。
+
+
 import importlib.util
 from pathlib import Path
 import unittest

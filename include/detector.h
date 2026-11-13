@@ -1,13 +1,26 @@
+// YOLO 检测部署 | include/detector.h
+// 单帧检测对外的入口。调用方给 detect 一张 OpenCV 图片，取回画好框的图片，
+// 还可以查询这一帧的检测记录和各阶段耗时。成员 backend_ 保存所选推理后端。
+// 这里看“能调用什么”，到 src/detector.cpp 看“这些步骤怎样串起来”。
+
+
 #pragma once
 #include "inference_backend.h"
 #include "yolo_processing.h"
 #include <memory>
 #include <string>
 
+
 // 模块：Detector接口：对外提供单帧检测和最近一次结果/计时
+
+
 class Detector {
 public:
+
+
     // 模块：后端选择：构造时确定使用ORT或TensorRT
+
+
     enum class BackendType { ORT, TensorRT };
     Detector(const std::string&,
              const std::string&,
@@ -15,10 +28,16 @@ public:
              const std::string& engine_path = "",
              bool use_cuda = false);
 
+
     // 模块：检测入口：输入原图，返回画好框的图片
+
+
     cv::Mat detect(const cv::Mat&);
 
+
     // 模块：只读结果接口：查询检测记录和各阶段统计
+
+
     const std::vector<Detection>& detections() const {
         return detections_;
     }
@@ -60,7 +79,11 @@ public:
     }
 
 private:
+
+
     // 模块：内部资源：保存类别名、独占后端和最近一帧状态
+
+
     std::vector<std::string> names_;
     // 独占后端所有权；通过统一虚接口调用ORT/TRT，Detector销毁时自动释放后端资源。
     // detect()会更新检测记录和计时，当前Pipeline仅让一个推理线程使用此对象。

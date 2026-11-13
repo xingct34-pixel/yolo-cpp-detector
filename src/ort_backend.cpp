@@ -1,3 +1,9 @@
+// YOLO 检测部署 | src/ort_backend.cpp
+// 把一帧浮点输入送进 ONNX Runtime。启动时检查模型约定，记住输入输出名称；
+// infer 用调用方的数据包装输入 Tensor，执行 Session::Run，再把输出复制到 vector。
+// 复制后即使这次 Run 的临时结果被释放，Detector 仍可以拿这些数字解码候选框。
+
+
 #include "ort_backend.h"
 #include <cstdlib>
 

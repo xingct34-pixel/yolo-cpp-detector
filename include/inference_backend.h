@@ -1,9 +1,16 @@
+// YOLO 检测部署 | include/inference_backend.h
+// Detector 通过这个共同接口调用不同推理库。输入是已经排好顺序的浮点数，
+// 返回的还是模型原始数字，画框之前要交给 decode_yolo 解释。
+// infer 后面的 = 0 要求具体后端提供实现。CPU 路径可以接着看 OrtBackend::infer。
+
+
 //规定推理后端必须提供哪些功能
 
 #pragma once
 
 #include <string>
 #include <vector>
+
 
 // 模块：统一后端接口：约定推理、计时和名称查询方法
 //
@@ -12,9 +19,11 @@
 // ORT / TensorRT 都只需要实现下面几个函数，
 // Detector 不需要关心底层到底使用哪个推理框架。
 
+
 class InferenceBackend {
 public:
     virtual ~InferenceBackend() = default;
+
 
     // 模块：推理模块
     //
@@ -23,18 +32,26 @@ public:
     //
     // 输出：
     //   模型原始输出
+
+
     virtual std::vector<float> infer(const std::vector<float>& input_data) = 0;
+
 
     // 模块：性能统计模块
     //
     // 返回最近一次推理耗时
+
+
     virtual double last_latency_ms() const = 0;
+
 
     // 模块：后端信息模块
     //
     // 例如：
     //   "ONNX Runtime"
     //   "TensorRT"
+
+
     virtual std::string name() const = 0;
 };
 
@@ -62,7 +79,7 @@ name()：后端名称
 Detector ──依赖──▶ InferenceBackend ◀──实现── OrtBackend
                                     ◀──实现── TrtBackend
 
-Detector 只认识接口。只有 createBackend() 这一个地方知道具体类，具体类的头文件只在它的 .cpp 里包含即可。
+Detector 只认识接口。本项目在 Detector 的构造函数中选择具体类，具体类的头文件只在它的 .cpp 里包含即可。
 */
 
 /*不懂

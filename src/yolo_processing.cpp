@@ -1,3 +1,9 @@
+// YOLO 检测部署 | src/yolo_processing.cpp
+// 把原图送进模型，再把模型坐标带回原图。本文件负责两端的转换和最终绘图。
+// 对本项目的 640 输入模型，8400 个候选来自 80×80 + 40×40 + 20×20 个位置；
+// 每个位置读 4 个框参数和 80 个类别分数。先筛分数，再按类别用 NMS 去掉重复框。
+
+
 #include "yolo_processing.h"
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
@@ -7,7 +13,10 @@
 #include <map>
 #include <stdexcept>
 
+
 // 模块：计时辅助：统计预处理各阶段耗时
+
+
 namespace {
 using Clock = std::chrono::steady_clock;
 
@@ -16,14 +25,20 @@ double ms(Clock::time_point a, Clock::time_point b) {
 }
 }
 
+
 // 模块：预处理：把BGR图片转换成固定NCHW模型输入
 // 预处理：BGR原图 -> 等比例缩放/补边 -> RGB、0~1、NCHW浮点数组。
 // 返回值交给模型；info通过引用保存几何变换，后处理还原坐标时必须使用同一份记录。
+
+
 std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, PreprocessTimes& times) {
     if (image.empty() || image.type() != CV_8UC3)
         throw std::invalid_argument("input must be a nonempty BGR uint8 image");
 
+
     // 模块：1. 几何计算：确定缩放尺寸及左上补边
+
+
     info = LetterboxInfo{};
     // 宽、高使用同一比例，取较小值才能让两边都放进640x640，避免拉伸变形。
     info.scale = std::min(640.f / image.cols, 640.f / image.rows);
@@ -35,7 +50,10 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
     info.pad_x = (640 - w) / 2;
     info.pad_y = (640 - h) / 2;
 
+
     // 模块：2. 图像变换：执行等比例缩放并补齐灰色边框
+
+
     auto begin = Clock::now();
     cv::Mat resized, padded;
     cv::resize(image, resized, {w, h});
@@ -51,10 +69,14 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
                        cv::BORDER_CONSTANT,
                        {114, 114, 114});
     auto padded_at = Clock::now();
+
+
     // 模块：3. 张量准备：直接向最终数组写入RGB归一化数据
     // [N,C,H,W]=[1,3,640,640]：1张图、RGB三通道；内存依次放整幅R、G、B。
     // data拥有内存，blob只借用data.data()，转换完成前不能让data销毁或扩容。
     // 直接写入最终vector，省去一份约4.69 MiB的中间张量及完整复制。
+
+
     std::vector<float> data(3u * 640 * 640);
     const int shape[] = {1, 3, 640, 640};
     cv::Mat blob(4, shape, CV_32F, data.data());
@@ -68,16 +90,23 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
     return data;
 }
 
+
 // 模块：后处理：从原始输出得到原图上的检测记录
+
+
 std::vector<Detection> decode_yolo(const std::vector<float>& output,
                                    cv::Size size,
                                    const LetterboxInfo& info,
                                    float confidence,
                                    float iou) {
+
+
     // 模块：1. 输出校验：检查固定模型参数、几何信息与阈值
     // 本项目固定为640输入的YOLO11 COCO导出模型，不是所有YOLO都能套用这些值。
     // 检测头步长8/16/32，对应80x80、40x40、20x20网格，共8400个候选位置。
     // 输出[1,84,8400]中84=中心x/y、宽/高这4项+80类分数，不另含objectness一项。
+
+
     constexpr int count = 8400, classes = 80;
     if (output.size() != 84u * count || size.width <= 0 || size.height <= 0 ||
         !std::isfinite(info.scale_x) || !std::isfinite(info.scale_y) || info.scale_x <= 0 ||
@@ -85,7 +114,10 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
         confidence > 1 || iou < 0 || iou > 1)
         throw std::invalid_argument("invalid YOLO output, geometry or thresholds");
 
+
     // 模块：2. 候选筛选：选择最高类别分数并还原坐标
+
+
     std::map<int, std::vector<Detection>> groups;
     // 一个候选框选一个最高分类分数；id=-1表示没有类别达到confidence门槛。
     for (int n = 0; n < count; ++n) {
@@ -107,8 +139,12 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
         if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || !std::isfinite(h) ||
             w <= 0 || h <= 0)
             continue;
+
+
         // 模块：2.1 坐标还原：去补边、反缩放并裁剪到原图边界
         // 先限制浮点坐标到原图边界，再四舍五入转整数，避免越界及过早整数转换。
+
+
         auto bound = [](double v, int upper) {
             return int(std::round(std::clamp(v, 0., double(upper))));
         };
@@ -123,7 +159,10 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
             groups[id].push_back({{left, top, right - left, bottom - top}, score, id});
     }
 
+
     // 模块：3. 同类去重：分别执行NMS，再汇总最终结果
+
+
     std::vector<Detection> result;
     // 按类别分别NMS：IoU=交集面积/并集面积，分数高的先保留，重叠超过阈值的同类框被抑制。
     // 不同类别即使完全重合也不互相抑制；同分时不额外定义业务优先级。
@@ -142,15 +181,21 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
             result.push_back(entry.second.at(k));
     }
 
+
     // 模块：4. 结果排序：分数从高到低，同分保持已有顺序
+
+
     std::stable_sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
         return a.score > b.score;
     });
     return result;
 }
 
+
 // 模块：结果绘制：在调用方图片上画框和类别文字
 // image是可修改引用，直接在调用方的图片上绘制；另两个const引用只读取检测记录和名称。
+
+
 void draw_detections(cv::Mat& image,
                      const std::vector<Detection>& detections,
                      const std::vector<std::string>& names) {

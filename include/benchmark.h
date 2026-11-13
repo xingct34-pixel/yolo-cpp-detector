@@ -1,7 +1,14 @@
+// YOLO 检测部署 | include/benchmark.h
+// 给每个要计时的阶段准备一个 Benchmark。调用方不断 record(毫秒)，再查询均值或 P95。
+// 总次数、总耗时与最近一批样本分别保存，长视频也能限制统计所用的内存。
+// 具体如何更新和计算在 src/benchmark.cpp，使用者之一是视频 Pipeline。
+
+
 #pragma once
 
 #include <cstddef>
 #include <vector>
+
 
 // 模块：Benchmark 性能统计模块
 //
@@ -12,17 +19,23 @@
 //
 // 这些指标比单纯看一次 FPS 更适合性能分析。
 
+
 // 性能基准统计类：记录每次耗时，并提供均值、分位数、极值等指标
 
 
 class Benchmark {
 public:
+
+
     // 模块：样本记录：累计耗时并维护有界统计缓冲
+
 
     // 记录一次耗时样本（单位：毫秒），同时更新总和、极值和计数
     void record(double latency_ms);
 
+
     // 模块：指标计算：提供均值、分位、极值及样本数量
+
 
     // 返回平均耗时（总耗时 / 总样本数）
     double average() const;
@@ -42,7 +55,9 @@ public:
     // 返回累计记录的样本总数
     size_t count() const;
 
+
     // 模块：指标展示：打印已收集的性能统计
+
 
     // 以 name 为标签打印所有统计指标
     void print(const char* name) const;

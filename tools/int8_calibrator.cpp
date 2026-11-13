@@ -1,3 +1,9 @@
+// YOLO 检测部署 | tools/int8_calibrator.cpp
+// 给实验性 TensorRT INT8 构建准备校准数据。校准器把样本图片整理成批次，
+// 构建器通过回调取到 GPU 输入地址，并可把校准结果保存下来供以后读取。
+// 这里与 cpu_quantize.py 的 CPU 静态量化是两条独立路径。
+
+
 #include "int8_calibrator.h"
 
 #include <opencv2/opencv.hpp>
@@ -28,7 +34,10 @@ bool isImageFile(const fs::path& path) {
 
 }
 
+
 // 模块：校准初始化：读取图片清单并分配批次缓冲（实验路径）
+
+
 YoloInt8Calibrator::YoloInt8Calibrator(const std::string& image_dir,
                                        const std::string& cache_file,
                                        int batch_size,
@@ -67,7 +76,10 @@ YoloInt8Calibrator::YoloInt8Calibrator(const std::string& image_dir,
     std::cout << "INT8 校准图片数量: " << image_paths_.size() << std::endl;
 }
 
+
 // 模块：校准清理：释放本对象持有的GPU缓冲
+
+
 YoloInt8Calibrator::~YoloInt8Calibrator() {
     if (device_input_) {
         cudaFree(device_input_);
@@ -75,7 +87,10 @@ YoloInt8Calibrator::~YoloInt8Calibrator() {
     }
 }
 
+
 // 模块：图片枚举：筛选并排序校准输入
+
+
 void YoloInt8Calibrator::loadImagePaths(const std::string& image_dir) {
     if (!fs::exists(image_dir)) {
         throw std::runtime_error("INT8 校准目录不存在: " + image_dir);
@@ -94,7 +109,10 @@ void YoloInt8Calibrator::loadImagePaths(const std::string& image_dir) {
     std::sort(image_paths_.begin(), image_paths_.end());
 }
 
+
 // 模块：图片预处理：生成校准批次需要的浮点输入
+
+
 bool YoloInt8Calibrator::preprocessImage(const std::string& image_path, float* output) {
     cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
 
@@ -154,6 +172,11 @@ int YoloInt8Calibrator::getBatchSize() const noexcept {
     return batch_size_;
 }
 
+
+// 模块：校准批次交接
+// 构建器调用一次就索取一批。bindings 是用来交还设备缓冲地址的位置。
+
+
 bool YoloInt8Calibrator::getBatch(void* bindings[], const char* names[], int nbBindings) noexcept {
     if (nbBindings != 1 || bindings == nullptr) {
         return false;
@@ -185,7 +208,10 @@ bool YoloInt8Calibrator::getBatch(void* bindings[], const char* names[], int nbB
     return true;
 }
 
+
 // 模块：缓存读取：为构建器提供已有校准结果（实验路径）
+
+
 const void* YoloInt8Calibrator::readCalibrationCache(std::size_t& length) noexcept {
     calibration_cache_.clear();
 
@@ -218,7 +244,10 @@ const void* YoloInt8Calibrator::readCalibrationCache(std::size_t& length) noexce
     return calibration_cache_.data();
 }
 
+
 // 模块：缓存保存：接收构建器回调并把校准结果写入文件（实验路径）
+
+
 void YoloInt8Calibrator::writeCalibrationCache(const void* cache, std::size_t length) noexcept {
     if (cache == nullptr || length == 0) {
         return;

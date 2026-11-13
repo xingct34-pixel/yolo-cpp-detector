@@ -1,3 +1,9 @@
+// YOLO 检测部署 | tools/coco_predict.cpp
+// validate_coco8.py 调用本文件编出的 yolo_coco_predict，按标注清单逐张读取原图。
+// 复用与主程序相同的预处理、OrtBackend 和框解码，把预测写成 COCO 格式的 JSON。
+// 每条记录的图像 ID、类别 ID 和原图坐标，是评估器与真值配对的依据。
+
+
 #include "ort_backend.h"
 #include "yolo_processing.h"
 #include <opencv2/imgcodecs.hpp>

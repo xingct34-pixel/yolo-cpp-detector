@@ -1,4 +1,11 @@
+# YOLO 检测部署 | bench/cpu_compare.py
+# 在相同视频上轮流运行顺序模式和流水线模式，读取各次 yolo_detector 的报告。
+# 同时核对输出帧数，避免把少处理帧造成的“变快”算作吞吐提升。
+
+
 # 模块：CPU基线比较：组织固定输入下的顺序与流水线测量
+
+
 """Alternating sequential/pipeline measurements; no claim of guaranteed speedup."""
 from pathlib import Path
 import hashlib, json, subprocess, time, os
@@ -16,6 +23,12 @@ record = {
     'threads': 3,
     'runs': [],
 }
+
+
+# 模块：交替顺序测量
+# 轮换两种模式谁先跑，减少固定顺序对缓存、温度等因素的偏向。
+
+
 for repeat in range(3):
     modes = ['sequential', 'pipeline'] if repeat % 2 == 0 else ['pipeline', 'sequential']
     for mode in modes:
