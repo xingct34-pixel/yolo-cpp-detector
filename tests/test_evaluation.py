@@ -1,15 +1,12 @@
 # YOLO 检测部署 | tests/test_evaluation.py
 # 为 evaluate_detection.py 准备有已知答案的小样本。一个真值配一个完全重合的正确框，
 # 与漏检、重复预测或错分类别比较，可以单独判断匹配和召回率计算有无偏差。
-#
-# 阅读地图（按源码顺序）
-#   1 已知答案
 
 
 import copy
-import importlib.util  # 按文件路径装载被测模块或检查依赖
-from pathlib import Path  # 拼接目录、文件名并读取文件
-import unittest  # 组织测试用例并核对预期结果
+import importlib.util
+from pathlib import Path
+import unittest
 
 spec = importlib.util.spec_from_file_location(
     'evaluation', Path(__file__).resolve().parents[1] / 'tools/evaluate_detection.py'

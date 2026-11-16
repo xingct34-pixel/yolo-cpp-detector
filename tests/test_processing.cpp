@@ -14,7 +14,7 @@
 #include <cmath>
 #include <limits>
 #include <iostream>
-#include <algorithm>  // 排序、查找、取最大最小值等标准算法
+#include <algorithm>
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 int main(){

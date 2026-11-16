@@ -3,9 +3,7 @@
 // 选用需要校准的 INT8 路径时，由 int8_calibrator 提供代表性图片。
 // 序列化后的文件才会交给 TrtBackend。构建与逐帧推理发生在不同阶段。
 //
-// 阅读地图（按源码顺序）
-//   1 构建日志 → 2 构建配置 → 3 帮助输出
-//   4 参数解析 → 5 产物保存 → 6 构建入口
+// 阅读顺序：读取构建选项 → 准备写入产物 → 解析 ONNX 并生成 Engine。
 
 
 #include "int8_calibrator.h"
@@ -15,10 +13,10 @@
 
 #include <cstdint>
 #include <cstdlib>
-#include <filesystem>  // 读取路径组成、拼接目录或检查文件
+#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <memory>  // 智能指针管理资源归属与释放时机
+#include <memory>
 #include <stdexcept>
 #include <string>
 

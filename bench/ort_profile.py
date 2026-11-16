@@ -8,10 +8,10 @@
 
 
 """Summarize an existing ORT JSON profile; node sums are not end-to-end latency."""
-import argparse  # 读取命令行输入并检查参数格式
-import collections  # 分组、计数等容器工具
-import json  # 在 Python 对象和 JSON 文本之间转换
-from pathlib import Path  # 拼接目录、文件名并读取文件
+import argparse
+import collections
+import json
+from pathlib import Path
 
 
 # 模块 1：算子归档

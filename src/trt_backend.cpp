@@ -3,24 +3,18 @@
 // 每帧把输入从主机复制到显存、提交推理，再把输出送回主机给 Detector。
 // 对应头文件为 trt_backend.h。实际速度和可用精度需要在兼容设备上测量。
 //
-// 阅读地图（按源码顺序）
-//   1 TensorRT日志 → 2 工具函数 → 3 构造初始化
-//   4 Engine 加载 → 5 Tensor 信息 → 6 CUDA Stream
-//   7 CUDA Buffer → 8 Tensor 地址绑定 → 9 资源回收
-//   10 Engine加载 → 11 Tensor信息 → 12 CUDA 内存管理模块
-//   13 TensorRT 推理模块 → 14 H2D → 15 TensorRT 执行
-//   16 D2H → 17 计时查询 → 18 后端识别
+// 阅读顺序：准备日志与辅助函数 → 装载 Engine 并分配资源 → 绑定输入输出 → 复制、执行、取回结果。
 
 
 #include "trt_backend.h"
 
 #include <cuda_runtime_api.h>  // 操作 CUDA 缓冲区、异步复制和执行流
 
-#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
+#include <vector>
 
 
 // 模块 1：TensorRT日志

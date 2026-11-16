@@ -6,9 +6,9 @@
 #   1 Profile口径 → 2 模拟耗时
 
 
-import importlib.util  # 按文件路径装载被测模块或检查依赖
-from pathlib import Path  # 拼接目录、文件名并读取文件
-import unittest  # 组织测试用例并核对预期结果
+import importlib.util
+from pathlib import Path
+import unittest
 
 spec = importlib.util.spec_from_file_location(
     'profile_report', Path(__file__).resolve().parents[1] / 'bench/ort_profile.py'

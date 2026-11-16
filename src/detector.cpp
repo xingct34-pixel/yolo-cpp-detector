@@ -3,9 +3,7 @@
 // 每次 detect 只处理一帧，依次准备浮点输入、执行模型、解码框、在图片副本上绘制。
 // 要看像素怎样变成张量，顺着 prepare_yolo 进入 yolo_processing.cpp。
 //
-// 阅读地图（按源码顺序）
-//   1 计时辅助 → 2 模型初始化 → 3 单帧检测
-//   4 输入准备 → 5 后端执行 → 6 结果处理
+// 阅读顺序：构造时选后端并加载资源 → 每帧预处理 → 后端推理 → 解码与绘图。
 
 
 #include "detector.h"  // 单帧检测入口，调用它即可走完预处理、推理和绘图
@@ -13,7 +11,7 @@
 #ifdef ENABLE_TENSORRT
 #include "trt_backend.h"
 #endif
-#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
+#include <chrono>
 #include <fstream>
 #include <stdexcept>
 

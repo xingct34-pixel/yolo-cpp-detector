@@ -8,11 +8,11 @@
 
 """Optional project-local comparison against pinned official pycocotools."""
 
-import importlib.util  # 按文件路径装载被测模块或检查依赖
-from pathlib import Path  # 拼接目录、文件名并读取文件
-import random  # 用种子产生可重复的随机样本
-import sys  # 访问解释器参数、模块搜索路径等运行环境
-import unittest  # 组织测试用例并核对预期结果
+import importlib.util
+from pathlib import Path
+import random
+import sys
+import unittest
 
 if not importlib.util.find_spec('pycocotools'):
     print('SKIP: project-local pycocotools is unavailable')

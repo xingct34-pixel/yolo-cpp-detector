@@ -17,17 +17,17 @@
 #       保证这里的处理方式和量化时完全一致。
 
 
-import argparse  # 解析命令行参数（--dataset 之类）
+import argparse
 import contextlib  # 临时改变输出去向，用来屏蔽官方工具的啰嗦打印
-import hashlib  # 计算 SHA256 指纹
+import hashlib
 import importlib.metadata  # 查询已安装库的版本号，写进报告方便复现
 import io  # 提供"内存里的假文件"，用来接住被屏蔽的输出
-import json  # 读写 JSON 文件
-from pathlib import Path  # 用对象的方式处理文件路径，比字符串拼接安全
+import json
+from pathlib import Path
 import subprocess  # 在 Python 里启动外部程序（这里用来启动 C++ 预测程序）
-import sys  # 用来修改模块搜索路径
+import sys
 
-import cv2  # OpenCV，用来读图片
+import cv2
 from pycocotools.coco import COCO  # 官方 COCO 数据集对象
 from pycocotools.cocoeval import COCOeval  # 官方 COCO 评分器
 
@@ -85,10 +85,10 @@ def convert(dataset, names):
                 {
                     'id': len(annotations) + 1,  # 标注框全局编号，从 1 开始
                     'image_id': index,  # 这个框属于哪张图
-                    'category_id': int(category) + 1,  # YOLO 类别从 0 起，COCO 这里从 1 起，所以加 1
+                    'category_id': int(category) + 1,  # 本脚本把下标 0、1、2 编为 1、2、3，与下面生成的 categories 一致；别套用到外部标注
                     'bbox': box,  # 框的位置：[左上角x, 左上角y, 宽, 高]，单位像素
                     'area': box[2] * box[3],  # 面积 = 宽 × 高，COCO 评估时用来区分大中小目标
-                    'iscrowd': 0,  # 0 表示不是"人群"类密集标注，当作普通单个目标
+                    'iscrowd': 0,  # 这批 YOLO 标签逐个框标注，这里统一按普通实例评分
                 }
             )
 

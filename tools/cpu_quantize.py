@@ -3,11 +3,7 @@
 # 同一输入分别跑两个模型，报告文件大小、推理时间和原始张量偏差。
 # 要了解框有没有检对，接着看 validate_coco8.py 的带标注评估。
 #
-# 阅读地图（按源码顺序）
-#   1 CPU量化工具 → 2 文件校验 → 3 图像预处理
-#   4 校准图片 → 5 校准数据接口 → 6 推理会话
-#   7 模型约定检查 → 8 执行入口 → 9 区分帧号与内容
-#   10 生成量化图 → 11 检查 QDQ → 12 成对测量
+# 阅读顺序：准备校准输入 → 核对模型与校准图像 → 生成并检查量化图 → 对照测量 FP32 和 INT8。
 
 
 # 这是一个YOLO 目标检测模型（ONNX 格式）的 INT8 量化实验工具。
@@ -55,16 +51,16 @@
 
 
 """CPU INT8 QDQ experiment using disjoint video frames. No implicit downloads."""
-import argparse  # 读取命令行输入并检查参数格式
-import hashlib  # 按文件或字节内容计算指纹
+import argparse
+import hashlib
 import importlib.metadata
-import json  # 在 Python 对象和 JSON 文本之间转换
-import math  # 检查有限数值或做数值运算
-from pathlib import Path  # 拼接目录、文件名并读取文件
-import time  # 记录时间、设置等待间隔或截止时刻
+import json
+import math
+from pathlib import Path
+import time
 
-import cv2  # 用 OpenCV 解码或处理图像
-import numpy as np  # 存放张量并按形状、通道进行数组计算
+import cv2
+import numpy as np
 import onnx
 import onnxruntime as ort
 from onnxruntime.quantization import CalibrationDataReader, QuantFormat, QuantType, quantize_static

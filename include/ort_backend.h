@@ -3,10 +3,7 @@
 // 同一个 OrtBackend 跟着 Detector 使用多帧，成员里的 Session 可以一直复用。
 // 对照 src/ort_backend.cpp 的构造函数和 infer，就能区分启动工作与逐帧工作。
 //
-// 阅读地图（按源码顺序）
-//   1 ORT后端接口 → 2 推理模块 → 3 性能统计模块
-//   4 后端信息模块 → 5 Session配置 → 6 Runtime 模块
-//   7 Tensor信息 → 8 计时查询
+// 阅读顺序：公开给 Detector 的接口 → 初始化 Session 所需的配置 → 在多帧之间复用的状态。
 
 
 #pragma once
@@ -16,7 +13,7 @@
 #include <onnxruntime_cxx_api.h>  // ORT 的 C++ 接口，包括 Session 和 Tensor
 
 #include <string>
-#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
+#include <vector>
 
 
 // 模块 1：ORT后端接口

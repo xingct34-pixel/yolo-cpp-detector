@@ -11,7 +11,7 @@
 #pragma once
 #include "inference_backend.h"  // 声明不同后端都必须实现的 infer 等方法
 #include "yolo_processing.h"  // 共享的 letterbox 几何信息、框解码和绘制接口
-#include <memory>  // 智能指针管理资源归属与释放时机
+#include <memory>
 #include <string>
 
 

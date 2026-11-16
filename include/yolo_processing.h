@@ -10,7 +10,7 @@
 
 #pragma once
 #include <opencv2/core.hpp>
-#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
+#include <vector>
 
 
 // 模块 1：几何记录

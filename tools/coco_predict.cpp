@@ -1,21 +1,19 @@
 // YOLO 检测部署 | tools/coco_predict.cpp
 // validate_coco8.py 调用本文件编出的 yolo_coco_predict，按标注清单逐张读取原图。
 // 复用与主程序相同的预处理、OrtBackend 和框解码，把预测写成 COCO 格式的 JSON。
-// 每条记录的图像 ID、类别 ID 和原图坐标，是评估器与真值配对的依据。
+// 目的：让评分器按同一张图、同一类别、同一套像素坐标比较预测和标注。
 //
-// 阅读地图（按源码顺序）
-//   1 精度数据导出程序（yolo_coco_predict） → 2 输入清单 → 3 整理类别表
-//   4 名字复核 → 5 逐图推理 → 6 逐图导出
+// 阅读顺序：读取清单并核对类别表 → 用同一模型逐图检测 → 写出评估器所需的编号和框。
 
 
 #include "ort_backend.h"  // 让 C++ 程序通过 ONNX Runtime 执行一次模型推理
 #include "yolo_processing.h"  // 共享的 letterbox 几何信息、框解码和绘制接口
 #include <opencv2/imgcodecs.hpp>
-#include <filesystem>  // 读取路径组成、拼接目录或检查文件
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
-#include <algorithm>  // 排序、查找、取最大最小值等标准算法
+#include <algorithm>
 
 
 // 模块 1：精度数据导出程序（yolo_coco_predict）
@@ -23,7 +21,7 @@
 //       供前面的 Python 脚本计算 AP。预处理和后处理直接复用项目主程序的代码，保证测的就是实际部署的流程。
 // 参数：标注 JSON、图片根目录、ONNX 模型、类别名文件、输出 JSON。
 // 置信度门槛故意设得很低（0.001），目的是保留尽可能多的候选框。
-// 通俗讲：算 AP 需要看"不同置信度下"的表现，如果一开始就把低分框丢了，曲线就不完整，AP 会算低。
+// 通俗讲：算 AP 需要看"不同置信度下"的表现，如果一开始就把低分框丢了，可能漏掉低分但正确的检测，让评估达不到原本可测的召回率。
 
 
 int main(int argc, char** argv) {
@@ -42,11 +40,11 @@ int main(int argc, char** argv) {
         cv::FileStorage dataset(argv[1], cv::FileStorage::READ | cv::FileStorage::FORMAT_JSON);
         if (!dataset.isOpened())
             throw std::runtime_error("cannot read annotations");
-        // 取出标注文件里所有类别的 ID，排序后用于"模型类别序号 → COCO 类别 ID"的映射
+        // 取出标注文件里所有类别的 ID，排序后用于"模型类别序号 → 当前标注文件里的类别 ID"的映射
 
 
         // 模块 3：整理类别表
-        // 假设三类的标注 ID 是 1、3、7。模型的下标 0、1、2 要依次映射到它们，不能直接把下标当作标注 ID。
+        // validate_coco8.py 自建的表连续编号 1～80，下标 2 对应 ID 3。换一份表，查到的值也可能变。
 
 
         std::vector<int> category_ids;
@@ -79,7 +77,7 @@ int main(int argc, char** argv) {
 
 
         // 模块 4：名字复核
-        // lower_bound 找到 ID 所在的位置。假设 ID=3，它在 [1,3,7] 的中间；减去 begin() 得到下标 1，再用名字表的第 1 项核对。
+        // 举例：若外部表的前几个 ID 是 [1,3,7,…]，ID 3 的下标就是 1，应与类名文件的第二个名字核对。完整表仍须有 80 类。
 
 
         for (const auto& category : dataset["categories"]) {
@@ -145,7 +143,7 @@ int main(int argc, char** argv) {
             for (const auto& detection : detections) {
                 // 对照一条结果读：同张图的多个框共享 image_id，每个框则各有自己的位置、类别号和置信分。
                 output << "{" << "image_id" << int(row["id"])
-                       // 模型输出的是 0~79 的类别序号，这里映射回 COCO 的真实类别 ID
+                       // 模型输出的是 0~79 的类别序号，at 从本次标注的已排序 ID 表取值；本程序没有内置 COCO 官方 ID 表
                        << "category_id" << category_ids.at(size_t(detection.class_id))
                        // bbox 格式：左上角 x、y，宽，高（像素），与 COCO 一致
                        << "bbox" << "["

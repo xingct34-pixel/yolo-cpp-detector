@@ -2,10 +2,7 @@
 # 通过真实命令行交替执行前后两个版本的程序或模型，同时记录耗时和进程资源。
 # 哈希值标识这一轮实际测的输入与程序，方便把读到的数字和对应版本对上。
 #
-# 阅读地图（按源码顺序）
-#   1 原生资源测量 → 2 文件校验 → 3 执行入口
-#   4 对照组 → 5 成对运行 → 6 采样对象
-#   7 帧数守恒
+# 阅读顺序：给二进制和输入算指纹 → 交替运行两组程序并采样 → 用帧计数检查测量是否可比。
 
 
 # 模块 1：原生资源测量
@@ -13,14 +10,14 @@
 
 
 """Alternating before/after CPU measurements through the actual C++ CLI."""
-import argparse  # 读取命令行输入并检查参数格式
-import hashlib  # 按文件或字节内容计算指纹
-import json  # 在 Python 对象和 JSON 文本之间转换
+import argparse
+import hashlib
+import json
 import os
-from pathlib import Path  # 拼接目录、文件名并读取文件
-import signal  # 向子进程传递退出信号
-import subprocess  # 启动外部程序，获取输出或退出码
-import time  # 记录时间、设置等待间隔或截止时刻
+from pathlib import Path
+import signal
+import subprocess
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 

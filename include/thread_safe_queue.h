@@ -3,16 +3,13 @@
 // 例如容量为 2，第三帧到达时，Block 会等空位，DropOldest 会腾掉最早的未处理项。
 // pop 在持锁时取元素，调用者拿到元素后可以在锁外推理。close 会唤醒等待者。
 //
-// 阅读地图（按源码顺序）
-//   1 容量策略 → 2 队列接口 → 3 初始化
-//   4 生产者入队 → 5 消费者出队 → 6 关闭通知
-//   7 只读统计 → 8 内部状态
+// 阅读顺序：选满队列策略 → 用 push/pop 交接帧 → 用 close 唤醒等待者 → 查询丢帧和峰值。
 
 
 #pragma once
-#include <algorithm>  // 排序、查找、取最大最小值等标准算法
-#include <condition_variable>  // 队列状态改变时唤醒等待者
-#include <mutex>  // 访问共享数据前加锁，离开临界区再让出锁
+#include <algorithm>
+#include <condition_variable>
+#include <mutex>
 #include <queue>
 #include <stdexcept>
 #include <utility>
@@ -30,7 +27,7 @@ enum class QueuePolicy { DropOldest, Block };
 // 功能：通过互斥锁和条件变量保护共享数据
 
 
-// T 由创建队列的代码决定。输入队列装待读帧记录、结果队列装处理结果，两者复用同一套锁与通知逻辑。
+// T 由创建队列的代码决定。输入队列装已读出、等待推理的帧、结果队列装处理结果，两者复用同一套锁与通知逻辑。
 template <class T> class ThreadSafeQueue {
 public:
 
@@ -85,7 +82,6 @@ public:
         });
         if (queue_.empty())
             return false;
-        // front只访问队头，pop才移除；取出后立即解锁，调用者的推理/显示不占此锁。
         // front 只访问队首，move 把它交给 item，pop 才真正删掉这个队列位置。
         item = std::move(queue_.front());
         queue_.pop();

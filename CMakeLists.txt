@@ -3,10 +3,7 @@
 # 先看 ONNXRUNTIME_ROOT 怎样定位头文件与动态库，再看 yolo_detector 组合了哪些 .cpp；
 # TensorRT 工具和部分 Python 验收由相应构建选项决定是否加入。
 #
-# 阅读地图（按源码顺序）
-#   1 定位依赖 → 2 核心源文件 → 3 离线构建工具
-#   4 可选 Python 测试 → 5 已知输入测试 → 6 精度与算子诊断
-#   7 官方评估交叉验证
+# 阅读顺序：定位 OpenCV 和 ONNX Runtime → 选择构建目标 → 注册本地测试和可选评估。
 
 
 cmake_minimum_required(VERSION 3.18)

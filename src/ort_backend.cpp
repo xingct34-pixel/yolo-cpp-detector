@@ -3,17 +3,13 @@
 // infer 用调用方的数据包装输入 Tensor，执行 Session::Run，再把输出复制到 vector。
 // 复制后即使这次 Run 的临时结果被释放，Detector 仍可以拿这些数字解码候选框。
 //
-// 阅读地图（按源码顺序）
-//   1 Session配置 → 2 可选性能诊断 → 3 CUDA Execution Provider 模块
-//   4 构造初始化 → 5 模型约定 → 6 推理模块
-//   7 输入包装 → 8 推理执行 → 9 输出读取
-//   10 计时查询 → 11 后端识别
+// 阅读顺序：配置会话 → 加载并核对模型形状 → 包装输入并调用 Run → 取回输出和耗时。
 
 
 #include "ort_backend.h"  // 让 C++ 程序通过 ONNX Runtime 执行一次模型推理
 #include <cstdlib>
 
-#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 

@@ -11,7 +11,7 @@
 
 
 """Alternating sequential/pipeline measurements; no claim of guaranteed speedup."""
-from pathlib import Path  # 拼接目录、文件名并读取文件
+from pathlib import Path
 import hashlib, json, subprocess, time, os
 
 ROOT = Path(__file__).resolve().parents[1]

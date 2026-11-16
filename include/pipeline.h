@@ -12,10 +12,10 @@
 #include "benchmark.h"  // 把多次计时样本汇总成均值和分位数
 #include "detector.h"  // 单帧检测入口，调用它即可走完预处理、推理和绘图
 #include "thread_safe_queue.h"  // 线程之间通过这个有界队列传递数据
-#include <atomic>  // 让跨线程共享的计数或标志以原子方式访问
-#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
+#include <atomic>
+#include <chrono>
 #include <exception>
-#include <mutex>  // 访问共享数据前加锁，离开临界区再让出锁
+#include <mutex>
 
 
 // 模块 1：运行配置

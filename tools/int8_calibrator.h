@@ -1,9 +1,6 @@
 // YOLO 检测部署 | tools/int8_calibrator.h
 // TensorRT 构建工具通过这个接口向校准器索取成批输入，也可以读写校准缓存。
 // 构建器决定何时要下一批，具体怎样找图、预处理和送入显存在同名 .cpp 中。
-//
-// 阅读地图（按源码顺序）
-//   1 校准器接口
 
 
 #pragma once
@@ -13,7 +10,7 @@
 
 #include <cstddef>
 #include <string>
-#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
+#include <vector>
 
 
 // 模块 1：校准器接口

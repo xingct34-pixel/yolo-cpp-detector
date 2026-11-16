@@ -3,18 +3,14 @@
 // 对本项目的 640 输入模型，8400 个候选来自 80×80 + 40×40 + 20×20 个位置；
 // 每个位置读 4 个框参数和 80 个类别分数。先筛分数，再按类别用 NMS 去掉重复框。
 //
-// 阅读地图（按源码顺序）
-//   1 计时辅助 → 2 预处理 → 3 几何计算
-//   4 图像变换 → 5 张量准备 → 6 后处理
-//   7 输出校验 → 8 候选筛选 → 9 1 坐标还原
-//   10 同类去重 → 11 结果排序 → 12 结果绘制
+// 阅读顺序：prepare_yolo 缩放、补边并构造张量 → decode_yolo 筛框并还原坐标 → 按类别去重 → 绘制结果。
 
 
 #include "yolo_processing.h"  // 共享的 letterbox 几何信息、框解码和绘制接口
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
-#include <algorithm>  // 排序、查找、取最大最小值等标准算法
-#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <stdexcept>
@@ -54,7 +50,6 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
     info.scale = std::min(640.f / image.cols, 640.f / image.rows);
     const int w = std::clamp(int(std::round(image.cols * info.scale)), 1, 640);
     const int h = std::clamp(int(std::round(image.rows * info.scale)), 1, 640);
-    // w/h已经取整，实际横纵比例可能略有差异，反变换不能只用理想scale。
     // 取整后记录横纵各自实际的比例。原图某一边很短时，两者和理想比例的差异更明显。
     info.scale_x = float(w) / image.cols;
     info.scale_y = float(h) / image.rows;
@@ -142,7 +137,7 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
         // 扁平数组按组存放：所有x、所有y、所有w、所有h、各类分数，每组8400个。
         // (4+c)*count+n先跳过坐标组及之前的类别组，再取第n个框的第c类分数。
         for (int c = 0; c < classes; ++c) {
-            // 例：取第 0 类第 3 个候选（下标 2），位置为 (4+0)×8400+2。最前面的四整组都是坐标。
+            // 例：取第 0 类第 3 个候选（下标 2），位置为 (4+0)×8400+2 = 33602。最前面的四整组都是坐标。
             float s = output[(4 + c) * count + n];
             if (std::isfinite(s) && s >= score && s <= 1) {
                 score = s;
@@ -158,7 +153,7 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
             continue;
 
 
-        // 模块 9：1 坐标还原
+        // 模块 9：坐标还原
         // 功能：去补边、反缩放并裁剪到原图边界
         // 先限制浮点坐标到原图边界，再四舍五入转整数，避免越界及过早整数转换。
 

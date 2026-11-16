@@ -3,18 +3,15 @@
 // 构建器通过回调取到 GPU 输入地址，并可把校准结果保存下来供以后读取。
 // 这里与 cpu_quantize.py 的 CPU 静态量化是两条独立路径。
 //
-// 阅读地图（按源码顺序）
-//   1 校准初始化 → 2 校准清理 → 3 图片枚举
-//   4 图片预处理 → 5 校准批次交接 → 6 缓存读取
-//   7 缓存保存
+// 阅读顺序：准备校准图像 → 预处理并向 TensorRT 提供批次 → 读写校准缓存。
 
 
 #include "int8_calibrator.h"
 
 #include <opencv2/opencv.hpp>
 
-#include <algorithm>  // 排序、查找、取最大最小值等标准算法
-#include <filesystem>  // 读取路径组成、拼接目录或检查文件
+#include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>

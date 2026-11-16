@@ -1,17 +1,14 @@
 # YOLO 检测部署 | tests/test_quantization.py
 # 用人工生成的纯色图检查量化工具的 prepare。红色像素经转换应落在 RGB 的首通道，
 # 灰色补边应为 114/255。先把输入核对好，才有依据解释 FP32 与 INT8 的输出偏差。
-#
-# 阅读地图（按源码顺序）
-#   1 奇数尺寸缩放
 
 
 """Optional preprocessing contract tests for the CPU quantization environment."""
-import importlib.util  # 按文件路径装载被测模块或检查依赖
-from pathlib import Path  # 拼接目录、文件名并读取文件
-import unittest  # 组织测试用例并核对预期结果
+import importlib.util
+from pathlib import Path
+import unittest
 
-import numpy as np  # 存放张量并按形状、通道进行数组计算
+import numpy as np
 
 spec = importlib.util.spec_from_file_location('cpu_quantize', Path(__file__).resolve().parents[1] / 'tools/cpu_quantize.py')
 quant = importlib.util.module_from_spec(spec)

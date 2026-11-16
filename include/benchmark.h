@@ -11,7 +11,7 @@
 #pragma once
 
 #include <cstddef>
-#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
+#include <vector>
 
 
 // 模块 1：Benchmark 性能统计模块

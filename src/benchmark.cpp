@@ -9,7 +9,7 @@
 
 #include "benchmark.h"  // 把多次计时样本汇总成均值和分位数
 
-#include <algorithm>  // 排序、查找、取最大最小值等标准算法
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>

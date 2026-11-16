@@ -3,12 +3,7 @@
 // 内部需要管理 NVIDIA 执行上下文、CUDA 流和显存。资源由这个对象管理。
 // 先读共同接口 inference_backend.h，再到 src/trt_backend.cpp 找这些资源何时创建与释放。
 //
-// 阅读地图（按源码顺序）
-//   1 TensorRT日志 → 2 TensorRT后端接口 → 3 推理模块
-//   4 性能统计模块 → 5 后端信息模块 → 6 Engine加载
-//   7 Tensor信息 → 8 CUDA缓冲 → 9 TensorRT 核心对象
-//   10 CUDA Stream → 11 Tensor 信息 → 12 GPU Buffer
-//   13 性能信息
+// 阅读顺序：记录 TensorRT 日志 → 声明推理接口 → 管理 Engine、执行流和缓冲区。
 
 
 #pragma once
@@ -20,9 +15,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>  // 智能指针管理资源归属与释放时机
+#include <memory>
 #include <string>
-#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
+#include <vector>
 
 
 // 模块 1：TensorRT日志

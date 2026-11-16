@@ -6,7 +6,7 @@
 #   1 核对完整处理 → 2 核对被丢弃的帧 → 3 信号场景
 
 
-from pathlib import Path  # 拼接目录、文件名并读取文件
+from pathlib import Path
 import subprocess,json,os,hashlib,tempfile,signal,time
 r=Path(__file__).resolve().parents[1];out=r/'results';out.mkdir(exist_ok=True);exe=r/'build-local/yolo_detector'
 base=[str(exe),'--model','models/yolo11n.onnx','--classes','data/coco.txt','--headless','--warmup','2']

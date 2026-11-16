@@ -8,15 +8,15 @@
 
 #include "thread_safe_queue.h"  // 线程之间通过这个有界队列传递数据
 
-#include <atomic>  // 让跨线程共享的计数或标志以原子方式访问
+#include <atomic>
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
 #include <cassert>
-#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
-#include <thread>  // 创建线程及等待线程退出
+#include <thread>
 
 int main()
 {

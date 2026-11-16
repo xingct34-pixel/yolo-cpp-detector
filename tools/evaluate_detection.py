@@ -4,20 +4,17 @@
 # IoU 门槛决定两个框能否配对，在多个门槛上计算 AP 后汇总成报告。
 # 该实现面向普通 bbox 标注；validate_coco8.py 另用官方工具复核同一批结果。
 #
-# 阅读地图（按源码顺序）
-#   1 输入校验 → 2 框交并比 → 3 单类匹配
-#   4 匹配同类目标 → 5 求单类 AP → 6 评估汇总
-#   7 多阈值汇总 → 8 命令入口 → 9 核对输入身份
+# 阅读顺序：校验数据和框 → 逐类匹配预测与标注 → 汇总各 IoU 阈值的 AP → 输出评估结果。
 
 
 """Dependency-free bbox AP evaluator for non-crowd COCO-format annotations."""
 
 
-import argparse  # 读取命令行输入并检查参数格式
-import hashlib  # 按文件或字节内容计算指纹
-import json  # 在 Python 对象和 JSON 文本之间转换
-import math  # 检查有限数值或做数值运算
-from pathlib import Path  # 拼接目录、文件名并读取文件
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
 
 
 # 模块 1：输入校验
@@ -58,7 +55,7 @@ def iou(a, b):
 
 
 # 模块 3：单类匹配
-# 功能：每张图最多100个预测，同一真值只能被当前类别匹配一次
+# 功能：在当前类别和 IoU 阈值下，每图保留前 100 个预测；一个真值只能匹配一次
 
 
 def class_ap(ground_truth, predictions, threshold):
@@ -98,7 +95,7 @@ def class_ap(ground_truth, predictions, threshold):
             tp += 1
         else:
             fp += 1
-        # 一票预测产生一个点。召回率分母是全部真值，精确率分母是到目前为止已经检查的预测。
+        # 例：该类共 4 个真值，前 3 个预测中有 2 个匹配。此时召回率 2/4，精确率 2/3。
         points.append((tp / len(ground_truth), tp / (tp + fp)))
     # 101点插值：每个召回位置取其右侧最高精确率，再求平均。
 
