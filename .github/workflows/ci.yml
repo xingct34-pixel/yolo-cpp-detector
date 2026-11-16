@@ -1,9 +1,7 @@
 # YOLO 检测部署 | .github/workflows/ci.yml
-# 提交代码后，GitHub 的 Linux runner 编译运行队列与 Benchmark 的小测试，
+# 功能：提交代码后，GitHub 的 Linux runner 编译运行队列与 Benchmark 的小测试，
 # 再执行 AP 和 Profile 的 Python 测试。这组快速检查只需要合成数据。
-#
-# 阅读地图（按源码顺序）
-#   1 构建环境 → 2 评分与诊断
+# 目的：让不具备本地模型和视频的 runner 也能检查队列、计时、评分和算子统计是否回归。
 
 
 name: Portable core checks
@@ -16,10 +14,8 @@ jobs:
     timeout-minutes: 15
 
 
-    # 模块 1：构建环境
+    # 构建环境
     # 从固定提交的 checkout 动作取回本仓库，在独立 Ubuntu runner 上编译小测试。
-
-
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Queue and bounded statistics without model or GPU
@@ -31,10 +27,9 @@ jobs:
           ./results/benchmark_test
 
 
-      # 模块 2：评分与诊断
+      # 评分与诊断
       # 用可手算的数据检查 AP 与 profile 汇总；这个步骤能运行在没有视频和模型的机器上。
-
-
+      # 这里的输入是测试构造的框和计时事件。CI 变绿能说明评分和汇总代码通过了这些样例；想看模型能否检测真实视频，要读 tests/real_cpu.py。
       - name: Detection AP and profile aggregation checks without datasets
         run: |
           python3 tests/test_evaluation.py

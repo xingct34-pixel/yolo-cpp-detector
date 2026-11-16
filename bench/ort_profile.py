@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # YOLO 检测部署 | bench/ort_profile.py
-# 离线读取 ONNX Runtime 写出的 Profile 时间线，按算子和执行后端累加 kernel_time。
+# 功能：离线读取 ONNX Runtime 写出的 Profile 时间线，按算子和执行后端累加 kernel_time。
 # 同一个运行里还含会话与其他事件；只挑节点执行事件，才不会把嵌套耗时重复相加。
-#
-# 阅读地图（按源码顺序）
-#   1 算子归档 → 2 筛选事件 → 3 报告入口
+# 目的：从一长串运行事件中找出值得去查的算子和执行后端。
 
 
 """Summarize an existing ORT JSON profile; node sums are not end-to-end latency."""
@@ -14,19 +12,16 @@ import json
 from pathlib import Path
 
 
-# 模块 1：算子归档
+# 模块：算子归档（summarize）
 # 功能：只计kernel_time事件，按实际算子和执行后端汇总
-
-
+# 假设 CPU 上两次 Conv 分别用了 10 和 20 微秒，它们在同一行合计 30 微秒；另一执行后端上的 Conv 单列。这样才知道时间具体花在哪类节点、哪个后端。
 def summarize(events):
     groups = collections.defaultdict(lambda: {'calls': 0, 'duration_us': 0.0})
     for event in events:
 
 
-        # 模块 2：筛选事件
+        # 筛选事件
         # 同一次 Run 会同时留下会话、节点等记录。只汇总节点 kernel_time，避免把一次计算重复相加。
-
-
         if event.get('cat') != 'Node' or not event.get('name', '').endswith('_kernel_time'):
             continue
         args = event.get('args', {})
@@ -41,10 +36,8 @@ def summarize(events):
     )
 
 
-# 模块 3：报告入口
+# 模块：报告入口（main）
 # 功能：只读分析Profile文件，保留原始Chrome Trace以便查看时间线
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('profile', type=Path)

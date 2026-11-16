@@ -1,9 +1,7 @@
 // YOLO 检测部署 | tests/test_thread_safe_queue.cpp
-// 用整数代替视频帧检验线程队列。容量 2 依次压入 1、2、3，可以直接看出丢了谁；
+// 功能：用整数代替视频帧检验线程队列。容量 2 依次压入 1、2、3，可以直接看出丢了谁；
 // 再安排线程等在空队列或满队列上，检查 close 能否唤醒它们以及剩余数据是否可取。
-//
-// 阅读地图（按源码顺序）
-//   1 等空队列 → 2 关后排空 → 3 满队列上的退出
+// 目的：把队满、队空和关闭放到真实线程中验证，检查被阻塞的一方是否能退出。
 
 
 #include "thread_safe_queue.h"  // 线程之间通过这个有界队列传递数据
@@ -50,10 +48,8 @@ int main()
     // 3. close() 必须唤醒正在等待数据的消费者。
 
 
-    // 模块 1：等空队列
+    // 等空队列
     // 让消费者先阻塞，再从别的线程关闭队列；如果忘记通知，测试会一直等不到线程结束。
-
-
     ThreadSafeQueue<int> waiting_queue(1);
     std::atomic<bool> consumer_finished{false};
 
@@ -77,20 +73,17 @@ int main()
     assert(drain_queue.push(42));
 
 
-    // 模块 2：关后排空
+    // 关后排空
     // 已经入队的元素仍然要能取走。关闭表示禁止继续生产，已有元素仍归消费者。
-
-
     drain_queue.close();
     assert(drain_queue.pop(item) && item == 42);
     assert(!drain_queue.pop(item));
     std::cout << "[通过] 关闭队列可排空已有数据\n";
 
 
-    // 模块 3：满队列上的退出
+    // 满队列上的退出
     // 先占满唯一空位让生产者等待，再 close，检查它能否退出。
-
-
+    // 生产者卡在满队列时调用 close，原来的 push 必须能醒来并返回 false。若只通知“等数据”的消费者，负责回收生产者的 join 就可能一直等。
     ThreadSafeQueue<int> blocking(1,QueuePolicy::Block);
     assert(blocking.push(1));std::atomic<bool> started{false},accepted{true};
     std::thread producer([&]{started=true;accepted=blocking.push(2);});

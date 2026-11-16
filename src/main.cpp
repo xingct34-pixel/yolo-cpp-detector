@@ -1,7 +1,8 @@
 // YOLO 检测部署 | src/main.cpp
-// 运行 yolo_detector 时从 main 开始。它读命令行，决定这次处理一张图片还是一段视频。
+// 功能：运行 yolo_detector 时从 main 开始。它读命令行，决定这次处理一张图片还是一段视频。
 // 图片直接交给 Detector；视频交给 Pipeline，后者会反复调用同一个 Detector。
 // 读代码时可以跟着 --image 看一遍，找到第一张画好检测框的图片在哪里保存。
+// 目的：先拦住不能解释的参数，再把单图和视频交给各自入口，失败时向调用脚本返回错误。
 //
 // 阅读顺序：准备参数并校验 → 初始化退出通知 → 单张图片检测或视频流水线。
 
@@ -14,10 +15,8 @@
 #include <stdexcept>
 
 
-// 模块 1：启动辅助
+// 模块：启动辅助
 // 功能：处理退出信号并校验整数参数
-
-
 namespace {
 std::atomic<bool> interrupted{false};
 static_assert(std::atomic<bool>::is_always_lock_free, "signal flag must be lock free");
@@ -27,10 +26,9 @@ void stop(int) {
 }
 
 
-// 模块 2：参数校验
+// 模块：参数校验（integer）
 // 整数参数必须整串解析完，再检查各参数自己的范围。范围是这个程序的接口约定。
-
-
+// 例如输入 4abc，开头的 4 确实能被转成整数，剩余字符仍说明整个参数无效。“转出了一个数”和“整串都是合法数字”要分别检查。
 int integer(const std::string& text, const std::string& key, int low, int high) {
     if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos)
         throw std::invalid_argument(key + " must be an integer");
@@ -47,19 +45,15 @@ int integer(const std::string& text, const std::string& key, int low, int high) 
 }
 
 
-// 模块 3：程序入口
+// 模块：程序入口（main）
 // 功能：解析参数，选择图片或视频处理流程
 // 入口只负责参数校验、选择图片/视频路径及统一异常出口；检测算法留给Detector。
-
-
 int main(int argc, char** argv) {
     try {
 
 
-        // 模块 4：参数配置
+        // 参数配置
         // 功能：设置默认值并解析命令行
-
-
         std::string video = "test.mp4", image, output, model = "models/yolo11n.onnx",
                     classes = "data/coco.txt", engine = "models/yolo11n.engine";
         auto type = Detector::BackendType::ORT;
@@ -142,21 +136,17 @@ int main(int argc, char** argv) {
         }
 
 
-        // 模块 5：退出通知
+        // 退出通知
         // 功能：把信号标志交给视频流水线
         // 信号回调只置原子标志；视频Pipeline的监视线程再正常关闭队列，回调中不做复杂清理。
-
-
         std::signal(SIGINT, stop);
         std::signal(SIGTERM, stop);
         // 把同一个退出标志的地址交给流水线，监视线程才能看到信号处理函数后来写入的状态。
         options.external_stop = &interrupted;
 
 
-        // 模块 6：图片模式
+        // 图片模式
         // 功能：读取图片、检测、保存图片及可选报告
-
-
         if (!image.empty()) {
             if (output.empty())
                 throw std::invalid_argument("--image requires --output");
@@ -165,10 +155,8 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("cannot read image: " + image);
 
 
-            // 模块 7：图片入口
+            // 图片入口
             // Detector 构造时打开模型，detect 用这一张图片推理。模型路径错和图片打不开是两个不同的失败点。
-
-
             Detector detector(model, classes, type, engine, cuda);
             auto result = detector.detect(input);
             if (!cv::imwrite(output, result))
@@ -180,10 +168,8 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("cannot write report");
 
 
-                // 模块 8：写 JSON
+                // 写 JSON
                 // 绘图给人看；这里还写出坐标及分数，脚本可以直接检查检测结果而不用识别画面。
-
-
                 fs << "schema_version" << 1 << "mode" << "image" << "detections" << "[";
                 for (const auto& d : detector.detections())
                     fs << "{" << "class_id" << d.class_id << "score" << d.score << "x" << d.box.x
@@ -194,10 +180,9 @@ int main(int argc, char** argv) {
         } else {
 
 
-            // 模块 9：视频模式
+            // 视频模式
             // 功能：构造流水线并开始处理
-
-
+            // 视频路径只在这里创建一次 Pipeline。看每一帧怎样处理，要进入 Pipeline::run；图片分支直接调用 Detector::detect，不会经过视频队列。
             Pipeline pipeline(video, model, classes, type, engine, cuda, capacity, options);
             pipeline.run();
         }

@@ -1,7 +1,8 @@
 // YOLO 检测部署 | src/yolo_processing.cpp
-// 把原图送进模型，再把模型坐标带回原图。本文件负责两端的转换和最终绘图。
+// 功能：把原图送进模型，再把模型坐标带回原图。本文件负责两端的转换和最终绘图。
 // 对本项目的 640 输入模型，8400 个候选来自 80×80 + 40×40 + 20×20 个位置；
 // 每个位置读 4 个框参数和 80 个类别分数。先筛分数，再按类别用 NMS 去掉重复框。
+// 目的：让网络能接收固定形状的输入，也让输出框回到用户所看的原图位置。
 //
 // 阅读顺序：prepare_yolo 缩放、补边并构造张量 → decode_yolo 筛框并还原坐标 → 按类别去重 → 绘制结果。
 
@@ -16,10 +17,8 @@
 #include <stdexcept>
 
 
-// 模块 1：计时辅助
+// 模块：计时辅助
 // 功能：统计预处理各阶段耗时
-
-
 namespace {
 using Clock = std::chrono::steady_clock;
 
@@ -29,21 +28,17 @@ double ms(Clock::time_point a, Clock::time_point b) {
 }
 
 
-// 模块 2：预处理
+// 模块：预处理（prepare_yolo）
 // 功能：把BGR图片转换成固定NCHW模型输入
 // 预处理：BGR原图 -> 等比例缩放/补边 -> RGB、0~1、NCHW浮点数组。
 // 返回值交给模型；info通过引用保存几何变换，后处理还原坐标时必须使用同一份记录。
-
-
 std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, PreprocessTimes& times) {
     if (image.empty() || image.type() != CV_8UC3)
         throw std::invalid_argument("input must be a nonempty BGR uint8 image");
 
 
-    // 模块 3：几何计算
+    // 几何计算
     // 功能：确定缩放尺寸及左上补边
-
-
     info = LetterboxInfo{};
     // 宽、高使用同一比例，取较小值才能让两边都放进640x640，避免拉伸变形。
     // 以 1280×960 为例，两个比例取较小的 0.5，得到 640×480；剩下的 160 行分给上、下边框。
@@ -57,10 +52,8 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
     info.pad_y = (640 - h) / 2;
 
 
-    // 模块 4：图像变换
+    // 图像变换
     // 功能：执行等比例缩放并补齐灰色边框
-
-
     auto begin = Clock::now();
     cv::Mat resized, padded;
     cv::resize(image, resized, {w, h});
@@ -78,13 +71,11 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
     auto padded_at = Clock::now();
 
 
-    // 模块 5：张量准备
+    // 张量准备
     // 功能：直接向最终数组写入RGB归一化数据
     // [N,C,H,W]=[1,3,640,640]：1张图、RGB三通道；内存依次放整幅R、G、B。
     // data拥有内存，blob只借用data.data()，转换完成前不能让data销毁或扩容。
     // 直接写入最终vector，省去一份约4.69 MiB的中间张量及完整复制。
-
-
     std::vector<float> data(3u * 640 * 640);
     const int shape[] = {1, 3, 640, 640};
     cv::Mat blob(4, shape, CV_32F, data.data());
@@ -99,10 +90,8 @@ std::vector<float> prepare_yolo(const cv::Mat& image, LetterboxInfo& info, Prepr
 }
 
 
-// 模块 6：后处理
+// 模块：后处理（decode_yolo）
 // 功能：从原始输出得到原图上的检测记录
-
-
 std::vector<Detection> decode_yolo(const std::vector<float>& output,
                                    cv::Size size,
                                    const LetterboxInfo& info,
@@ -110,13 +99,11 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
                                    float iou) {
 
 
-    // 模块 7：输出校验
+    // 输出校验
     // 功能：检查固定模型参数、几何信息与阈值
     // 本项目固定为640输入的YOLO11 COCO导出模型，不是所有YOLO都能套用这些值。
     // 检测头步长8/16/32，对应80x80、40x40、20x20网格，共8400个候选位置。
     // 输出[1,84,8400]中84=中心x/y、宽/高这4项+80类分数，不另含objectness一项。
-
-
     constexpr int count = 8400, classes = 80;
     if (output.size() != 84u * count || size.width <= 0 || size.height <= 0 ||
         !std::isfinite(info.scale_x) || !std::isfinite(info.scale_y) || info.scale_x <= 0 ||
@@ -125,10 +112,9 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
         throw std::invalid_argument("invalid YOLO output, geometry or thresholds");
 
 
-    // 模块 8：候选筛选
+    // 候选筛选
     // 功能：选择最高类别分数并还原坐标
-
-
+    // 例如同一位置的“人”分数 0.82、“车”分数 0.30，先选出这个位置的最佳类别，再把框放进该类的候选列表。下一步 NMS 比的是同类不同框的重叠程度。
     std::map<int, std::vector<Detection>> groups;
     // 一个候选框选一个最高分类分数；扫描完仍为 id=-1 表示没有合法分数达到 confidence 门槛。
     for (int n = 0; n < count; ++n) {
@@ -153,11 +139,10 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
             continue;
 
 
-        // 模块 9：坐标还原
+        // 坐标还原
         // 功能：去补边、反缩放并裁剪到原图边界
         // 先限制浮点坐标到原图边界，再四舍五入转整数，避免越界及过早整数转换。
-
-
+        // 例：原图缩小一半、左边补了 20 像素；网络输入里的左边界为 70，原图左边界就是 (70−20)/0.5=100。先还原再限制在图片范围内，防止画出界。
         auto bound = [](double v, int upper) {
             return int(std::round(std::clamp(v, 0., double(upper))));
         };
@@ -174,10 +159,8 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
     }
 
 
-    // 模块 10：同类去重
+    // 同类去重
     // 功能：分别执行NMS，再汇总最终结果
-
-
     std::vector<Detection> result;
     // 按类别分别NMS：IoU=交集面积/并集面积，分数高的先保留，重叠超过阈值的同类框被抑制。
     // 不同类别即使完全重合也不互相抑制；同分时不额外定义业务优先级。
@@ -199,10 +182,8 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
     }
 
 
-    // 模块 11：结果排序
+    // 结果排序
     // 功能：分数从高到低，同分保持已有顺序
-
-
     // 同分时保留输入排序已有的前后关系。它不重新决定上一阶段哪些框被压掉。
     std::stable_sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
         return a.score > b.score;
@@ -211,11 +192,9 @@ std::vector<Detection> decode_yolo(const std::vector<float>& output,
 }
 
 
-// 模块 12：结果绘制
+// 模块：结果绘制（draw_detections）
 // 功能：在调用方图片上画框和类别文字
 // image是可修改引用，直接在调用方的图片上绘制；另两个const引用只读取检测记录和名称。
-
-
 void draw_detections(cv::Mat& image,
                      const std::vector<Detection>& detections,
                      const std::vector<std::string>& names) {

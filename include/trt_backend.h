@@ -1,7 +1,8 @@
 // YOLO 检测部署 | include/trt_backend.h
-// 声明实验性的 TensorRT 后端。它和 OrtBackend 接受同一种预处理输入，
+// 功能：声明实验性的 TensorRT 后端。它和 OrtBackend 接受同一种预处理输入，
 // 内部需要管理 NVIDIA 执行上下文、CUDA 流和显存。资源由这个对象管理。
 // 先读共同接口 inference_backend.h，再到 src/trt_backend.cpp 找这些资源何时创建与释放。
+// 目的：让 Detector 复用推理接口，并把实验后端专用的显存、流和上下文交给后端对象管理。
 //
 // 阅读顺序：记录 TensorRT 日志 → 声明推理接口 → 管理 Engine、执行流和缓冲区。
 
@@ -20,20 +21,16 @@
 #include <vector>
 
 
-// 模块 1：TensorRT日志
+// 模块：TensorRT日志（TrtLogger）
 // 功能：输出后端警告和错误
-
-
 class TrtLogger : public nvinfer1::ILogger {
 public:
     void log(Severity severity, const char* msg) noexcept override;
 };
 
 
-// 模块 2：TensorRT后端接口
+// 模块：TensorRT后端接口（TrtBackend）
 // 功能：声明实验实现，具体逻辑位于trt_backend.cpp
-
-
 class TrtBackend : public InferenceBackend {
 public:
     explicit TrtBackend(const std::string& engine_path);
@@ -42,44 +39,32 @@ public:
     ~TrtBackend() override;
 
 
-    // 模块 3：推理模块
-
-
+    // 推理模块（infer）
     std::vector<float> infer(const std::vector<float>& input_data) override;
 
 
-    // 模块 4：性能统计模块
-
-
+    // 性能统计模块（last_latency_ms）
     double last_latency_ms() const override;
 
 
-    // 模块 5：后端信息模块
-
-
+    // 后端信息模块（name）
     std::string name() const override;
 
 private:
 
 
-    // 模块 6：Engine加载
+    // Engine加载（loadEngine）
     // 功能：读取执行计划并创建Runtime和Context
-
-
     void loadEngine(const std::string& engine_path);
 
 
-    // 模块 7：Tensor信息
+    // Tensor信息（inspectTensors）
     // 功能：保存输入输出的名称、形状和元素数量
-
-
     void inspectTensors();
 
 
-    // 模块 8：CUDA缓冲
+    // CUDA缓冲（allocateBuffers）
     // 功能：申请和释放输入输出显存
-
-
     void allocateBuffers();
 
     void releaseBuffers();
@@ -87,9 +72,8 @@ private:
 private:
 
 
-    // 模块 9：TensorRT 核心对象
-
-
+    // TensorRT 核心对象
+    // Runtime 读入序列化的 Engine；Engine 描述可执行的网络；Context 保存执行这次推理所需的状态。具体创建顺序在 TrtBackend 的构造和 loadEngine 中。
     TrtLogger logger_;
 
     // Runtime（工厂管理系统）
@@ -102,17 +86,13 @@ private:
     std::unique_ptr<nvinfer1::IExecutionContext> context_;
 
 
-    // 模块 10：CUDA Stream
-
-
+    // CUDA Stream
     // Stream（生产线上的传送带）
     // 一次 infer 内的复制和执行沿同一 stream 提交。实现里同步之后，CPU 才可以放心读回传结果。
     cudaStream_t stream_ = nullptr;
 
 
-    // 模块 11：Tensor 信息
-
-
+    // Tensor 信息
     std::string input_name_;
     std::string output_name_;
 
@@ -123,9 +103,7 @@ private:
     size_t output_elements_ = 0;
 
 
-    // 模块 12：GPU Buffer
-
-
+    // GPU Buffer
     // GPU 显存中的输入
     void* device_input_ = nullptr;
 
@@ -133,8 +111,6 @@ private:
     void* device_output_ = nullptr;
 
 
-    // 模块 13：性能信息
-
-
+    // 性能信息
     double last_latency_ms_ = 0.0;
 };

@@ -1,7 +1,8 @@
 // YOLO 检测部署 | include/thread_safe_queue.h
-// 视频各阶段速度不同，这个模板把“暂存数据”和“跨线程交接”放在一起。
+// 功能：视频各阶段速度不同，这个模板把“暂存数据”和“跨线程交接”放在一起。
 // 例如容量为 2，第三帧到达时，Block 会等空位，DropOldest 会腾掉最早的未处理项。
 // pop 在持锁时取元素，调用者拿到元素后可以在锁外推理。close 会唤醒等待者。
+// 目的：把“谁能动队首”和“没数据时怎么等”封装起来，让调用方在释放队列锁后处理一帧。
 //
 // 阅读顺序：选满队列策略 → 用 push/pop 交接帧 → 用 close 唤醒等待者 → 查询丢帧和峰值。
 
@@ -15,27 +16,21 @@
 #include <utility>
 
 
-// 模块 1：容量策略
+// 模块：容量策略（QueuePolicy）
 // 功能：按任务目标选择阻塞等待或丢弃旧数据
 // Block：满时生产者等待，适合保留离线帧；DropOldest：丢最旧待处理项，偏向实时新鲜度。
-
-
 enum class QueuePolicy { DropOldest, Block };
 
 
-// 模块 2：队列接口
+// 模块：队列接口（ThreadSafeQueue）
 // 功能：通过互斥锁和条件变量保护共享数据
-
-
 // T 由创建队列的代码决定。输入队列装已读出、等待推理的帧、结果队列装处理结果，两者复用同一套锁与通知逻辑。
 template <class T> class ThreadSafeQueue {
 public:
 
 
-    // 模块 3：初始化
+    // 初始化（ThreadSafeQueue）
     // 功能：设定容量及满队列处理策略
-
-
     explicit ThreadSafeQueue(size_t capacity, QueuePolicy policy = QueuePolicy::DropOldest)
         : capacity_(capacity), policy_(policy) {
         if (!capacity)
@@ -43,11 +38,10 @@ public:
     }
 
 
-    // 模块 4：生产者入队
+    // 生产者入队（push）
     // 功能：按策略处理满队列并通知消费者
     // 锁只保护队列、关闭状态和计数；通知是唤醒信号，数据仍通过队列交接。
-
-
+    // 容量为 2、队列已有 [A,B]，C 到来时有两条路：Block 等 B 前面的 A 被取走，DropOldest 直接移走 A；后者会把 dropped_ 加一。
     bool push(T item) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (policy_ == QueuePolicy::Block)
@@ -69,10 +63,9 @@ public:
     }
 
 
-    // 模块 5：消费者出队
+    // 消费者出队（pop）
     // 功能：等待数据，取出后立即释放锁
-
-
+    // 调用方传入的 item 是引用，pop 把队首的值移给它，布尔返回值只回答“这次有没有取到”。因此关闭且已空时，调用方要先看 false，再决定是否使用 item。
     bool pop(T& item) {
         std::unique_lock<std::mutex> lock(mutex_);
         // wait睡眠时释放锁，醒来重新加锁并检查条件，避免空转及虚假唤醒误取数据。
@@ -91,12 +84,10 @@ public:
     }
 
 
-    // 模块 6：关闭通知
+    // 关闭通知（close）
     // 功能：拒绝新数据，唤醒等待者并允许排空旧数据
     // close不清空队列；关闭且非空仍可取出旧数据，关闭且为空时pop才返回false。
     // 两类等待者都要唤醒，避免生产者卡在满队列、消费者卡在空队列，导致join一直等待。
-
-
     void close() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -108,10 +99,8 @@ public:
     }
 
 
-    // 模块 7：只读统计
+    // 只读统计（dropped）
     // 功能：查询丢弃数量和队列峰值
-
-
     size_t dropped() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return dropped_;
@@ -125,10 +114,8 @@ public:
 private:
 
 
-    // 模块 8：内部状态
+    // 内部状态
     // 功能：共享容器、同步原语与容量计数
-
-
     std::queue<T> queue_;
     mutable std::mutex mutex_;
     std::condition_variable not_empty_, not_full_;

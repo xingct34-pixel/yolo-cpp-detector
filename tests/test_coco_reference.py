@@ -1,9 +1,7 @@
 # YOLO 检测部署 | tests/test_coco_reference.py
-# 用固定随机种子生成预测，再把同一份标注与预测交给两个评估器。
+# 功能：用固定随机种子生成预测，再把同一份标注与预测交给两个评估器。
 # 对照 pycocotools 检查排序同分、每图预测数量限制等容易让 AP 悄悄变化的情况。
-#
-# 阅读地图（按源码顺序）
-#   1 官方交叉验证 → 2 可重复造样本 → 3 截断边界
+# 目的：用同一组预测比较本地与官方评分结果，尽早发现同分和截断边界上的偏差。
 
 
 """Optional project-local comparison against pinned official pycocotools."""
@@ -22,18 +20,14 @@ from tools.evaluate_detection import evaluate
 from tools.validate_coco8 import official_ap
 
 
-# 模块 1：官方交叉验证
+# 模块：官方交叉验证（ReferenceTests）
 # 功能：固定随机种子、相同分数、空类别和maxDets截断均有已知参考
-
-
 class ReferenceTests(unittest.TestCase):
     def test_reference_parity(self):
 
 
-        # 模块 2：可重复造样本
+        # 可重复造样本
         # 固定随机种子后，失败消息中的 seed 可以重现具体的框与分数。
-
-
         for seed in range(12):
             rng = random.Random(seed)
             dataset = {
@@ -68,10 +62,9 @@ class ReferenceTests(unittest.TestCase):
                         )
 
 
-            # 模块 3：截断边界
+            # 截断边界
             # 额外放入超过 100 个高分误报，检查两套评分器是否在每图每类相同的位置截断。
-
-
+            # 当同一图、同一类恰好挤过 100 个预测时，排在边界两侧的框能不能留下会影响 AP。对两套评估器喂相同的预测，再看这个边界有没有处理一致。
             if seed == 0:
                 predictions.extend(
                     [

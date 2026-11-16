@@ -1,11 +1,8 @@
 // YOLO 检测部署 | include/detector.h
-// 单帧检测对外的入口。调用方给 detect 一张 OpenCV 图片，取回画好框的图片，
+// 功能：单帧检测对外的入口。调用方给 detect 一张 OpenCV 图片，取回画好框的图片，
 // 还可以查询这一帧的检测记录和各阶段耗时。成员 backend_ 保存所选推理后端。
 // 这里看“能调用什么”，到 src/detector.cpp 看“这些步骤怎样串起来”。
-//
-// 阅读地图（按源码顺序）
-//   1 Detector接口 → 2 后端选择 → 3 检测入口
-//   4 只读结果接口 → 5 内部资源
+// 目的：让单图入口和视频流水线复用同一个检测流程，调用方只需给图像并取结果。
 
 
 #pragma once
@@ -15,18 +12,14 @@
 #include <string>
 
 
-// 模块 1：Detector接口
+// 模块：Detector接口
 // 功能：对外提供单帧检测和最近一次结果/计时
-
-
 class Detector {
 public:
 
 
-    // 模块 2：后端选择
+    // 后端选择（BackendType）
     // 功能：构造时确定使用ORT或TensorRT
-
-
     enum class BackendType { ORT, TensorRT };
     Detector(const std::string&,
              const std::string&,
@@ -35,17 +28,14 @@ public:
              bool use_cuda = false);
 
 
-    // 模块 3：检测入口
+    // 检测入口
     // 功能：输入原图，返回画好框的图片
-
-
     cv::Mat detect(const cv::Mat&);
 
 
-    // 模块 4：只读结果接口
+    // 只读结果接口
     // 功能：查询检测记录和各阶段统计
-
-
+    // 要保留第 1 帧的检测结果，须在下一次 detect 前复制 detections() 返回的容器。它是成员的只读引用，下一帧会改写这份成员数据。
     const std::vector<Detection>& detections() const {
         // detections_ 随下一次 detect 更新。调用方若要长期保存某帧的框，应保存自己的副本。
         return detections_;
@@ -90,10 +80,8 @@ public:
 private:
 
 
-    // 模块 5：内部资源
+    // 内部资源
     // 功能：保存类别名、独占后端和最近一帧状态
-
-
     std::vector<std::string> names_;
     // 独占后端所有权；通过统一虚接口调用ORT/TRT，Detector销毁时自动释放后端资源。
     // detect()会更新检测记录和计时，当前Pipeline仅让一个推理线程使用此对象。

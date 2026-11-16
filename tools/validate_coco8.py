@@ -1,7 +1,8 @@
 # YOLO 检测部署 | tools/validate_coco8.py
-# 一次小样本回归的入口。它把已有数据集的标签换算成原图坐标，分别调用
+# 功能：一次小样本回归的入口。它把已有数据集的标签换算成原图坐标，分别调用
 # yolo_coco_predict 导出两个模型的预测，再用项目评估器和官方 COCOeval 交叉核对。
 # 先看 main 里的文件流向，再看 convert 如何把归一化框换成像素。
+# 目的：在相同的小样本标注上比较两份模型，并用官方评估器复核本地评分。
 #
 # 阅读地图（按代码顺序）：
 #   模块 0 准备工作  -> 导入工具、设置路径
@@ -15,8 +16,6 @@
 # 功能：引入后面要用的标准库、第三方库和项目内部工具，并告诉 Python 去哪里找项目代码。
 # 目的：让本脚本能直接运行，并且能复用项目里已有的预处理、哈希、评估函数，
 #       保证这里的处理方式和量化时完全一致。
-
-
 import argparse
 import contextlib  # 临时改变输出去向，用来屏蔽官方工具的啰嗦打印
 import hashlib
@@ -46,8 +45,6 @@ from tools.evaluate_detection import evaluate
 #       "考试用的图"和"量化校准用的图"没有内容完全相同的张量。
 # 通俗讲：YOLO 和 COCO 是两种"标注记账方式"，就像同一笔账，一个用"中心点+比例"记，
 #         一个用"左上角+像素"记，这里负责把账本重新抄一遍。
-
-
 def convert(dataset, names):
     # images：图片信息列表；annotations：标注框列表；hashes：每张图预处理后的指纹
     images, annotations, hashes = [], [], {}
@@ -113,8 +110,6 @@ def convert(dataset, names):
 # 目的：作为"标准答案"，用来检验项目自己写的评估函数算得对不对，
 #       防止因为自研评分程序有 bug 而得出错误结论。
 # 通俗讲：自己写的评分程序可能有 bug，所以再找官方评分程序算一遍，两边分数一致才放心。
-
-
 def official_ap(dataset, predictions):
     # 没有任何预测框时官方工具会报错，这种情况直接定义为 AP 全为 0
     if not predictions:
@@ -147,8 +142,7 @@ def official_ap(dataset, predictions):
 #       （图不重复、模型没拿错、评分程序没算错）。
 # 通俗讲：这是"量化之后检测效果到底掉了多少"的小型验收考试，
 #         main 就是监考老师，负责出卷、收卷、判卷、核对答案、出成绩单。
-
-
+# 一份预测算两次：evaluate(dataset, predictions) 直接调用本地评分函数，official_ap 用 pycocotools 复核同一份框。换模型比较 FP32 和 INT8 是外层循环的职责。
 def main():
     # ---- 第一步：读取命令行参数 ----
     parser = argparse.ArgumentParser(description=__doc__)
@@ -262,7 +256,5 @@ def main():
 # 模块 4：脚本入口
 # 功能：只有直接运行本文件（python validate_coco8.py ...）时才执行 main()。
 # 目的：这个文件也可能被别的文件 import 来借用函数，此时不应该自动开始跑整套测试。
-
-
 if __name__ == '__main__':
     main()

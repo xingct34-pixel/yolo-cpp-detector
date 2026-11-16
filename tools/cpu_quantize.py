@@ -1,7 +1,8 @@
 # YOLO 检测部署 | tools/cpu_quantize.py
-# 离线比较 YOLO 的 FP32 和静态 INT8 模型。前一组视频帧用于校准，后一组用于比较。
+# 功能：离线比较 YOLO 的 FP32 和静态 INT8 模型。前一组视频帧用于校准，后一组用于比较。
 # 同一输入分别跑两个模型，报告文件大小、推理时间和原始张量偏差。
 # 要了解框有没有检对，接着看 validate_coco8.py 的带标注评估。
+# 目的：用同一输入比较转换前后的体积、速度和数值偏差，筛出需要进一步做精度验证的模型。
 #
 # 阅读顺序：准备校准输入 → 核对模型与校准图像 → 生成并检查量化图 → 对照测量 FP32 和 INT8。
 
@@ -46,10 +47,8 @@
 # 计时口径说明：只计 Session.run，不含预处理和排队，避免被误解为端到端延迟。
 
 
-# 模块 1：CPU量化工具
+# 模块：CPU量化工具
 # 功能：校准、静态INT8转换及正确性/性能对比
-
-
 """CPU INT8 QDQ experiment using disjoint video frames. No implicit downloads."""
 import argparse
 import hashlib
@@ -67,10 +66,8 @@ from onnxruntime.quantization import CalibrationDataReader, QuantFormat, QuantTy
 from onnxruntime.quantization.shape_inference import quant_pre_process
 
 
-# 模块 2：文件校验
+# 模块：文件校验（sha256）
 # 功能：分块计算SHA-256
-
-
 def sha256(path):
     digest = hashlib.sha256()
     with Path(path).open('rb') as handle:
@@ -79,18 +76,14 @@ def sha256(path):
     return digest.hexdigest()
 
 
-# 模块 3：图像预处理
+# 模块：图像预处理（prepare）
 # 功能：生成与C++输入约定一致的校准数据
-
-
 def prepare(image):
     """Match prepare_yolo: round positive dimensions, center padding, RGB NCHW."""
 
 
-    # 模块 4：校准图片
+    # 校准图片
     # 校准输入必须和部署时看到的像素含义一致。例如红蓝通道倒了，即使张量形状正确，采样到的激活范围也会变。
-
-
     if image is None or image.dtype != np.uint8 or image.ndim != 3 or image.shape[2] != 3:
         raise ValueError('expected nonempty BGR uint8 image')
     height, width = image.shape[:2]
@@ -114,10 +107,8 @@ def prepare(image):
     return cv2.dnn.blobFromImage(padded, 1 / 255, swapRB=True, crop=False, ddepth=cv2.CV_32F)
 
 
-# 模块 5：校准数据接口
+# 模块：校准数据接口（Reader）
 # 功能：按批提供已经准备好的输入
-
-
 # 量化器主动向 Reader 索取下一份输入。字典的键是模型的实际输入名，值是已排成 NCHW 的图片。
 class Reader(CalibrationDataReader):
     def __init__(self, name, tensors):
@@ -125,6 +116,7 @@ class Reader(CalibrationDataReader):
         self.tensors = tensors
         self.rewind()
 
+    # 校准器每要一批就调用一次。返回字典时键必须对上模型的输入名；数据用尽返回 None，量化库才知道采样结束。
     def get_next(self):
         tensor = next(self.iterator, None)
         return None if tensor is None else {self.name: tensor}
@@ -133,20 +125,17 @@ class Reader(CalibrationDataReader):
         self.iterator = iter(self.tensors)
 
 
-# 模块 6：推理会话
+# 模块：推理会话（session）
 # 功能：建立CPU执行会话
-
-
 def session(path, threads):
     options = ort.SessionOptions()
     options.intra_op_num_threads = threads
     return ort.InferenceSession(str(path), options, providers=['CPUExecutionProvider'])
 
 
-# 模块 7：模型约定检查
+# 模块：模型约定检查（check_contract）
 # 功能：验证输入输出类型和形状
-
-
+# 即使图中部分算子已量化，部署端仍可能收发 FP32 张量。这里看输入输出的类型和形状；量化算子有没有插进去，则要在 main 里检查图中的 Q/DQ 节点。
 # 读取会话元数据时的 [1,3,640,640] 是形状描述；真正的一张图包含 1×3×640×640 个浮点数。
 def check_contract(engine):
     # 获取模型的全部输入和输出节点信息
@@ -165,10 +154,8 @@ def check_contract(engine):
         raise ValueError('expected FP32 output [1,84,8400]')
 
 
-# 模块 8：执行入口
+# 模块：执行入口（main）
 # 功能：读取参数并组织该工具的完整流程
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', type=Path, required=True)
@@ -228,10 +215,8 @@ def main():
         ]
 
 
-        # 模块 9：区分帧号与内容
+        # 区分帧号与内容
         # 视频中的第 1 帧和第 2 帧可能像素完全相同；用张量哈希才能识别这种重复。
-
-
         calibration_hashes = set(report['calibration_tensor_sha256'])
         evaluation_hashes = set(report['evaluation_tensor_sha256'])
         report['unique_calibration_tensors'] = len(calibration_hashes)
@@ -250,10 +235,8 @@ def main():
         prepared = args.output / 'model.prepared.onnx'
 
 
-        # 模块 10：生成量化图
+        # 生成量化图
         # 先整理原模型图，再用 Reader 给出的样本统计激活范围。校准只需输入图像，不依赖人工标框。
-
-
         quant_pre_process(str(args.model), str(prepared))
         
         # 静态量化：把 FP32 模型转成 INT8 模型，目的是让模型更小、推理更快。
@@ -285,10 +268,8 @@ def main():
         counts = {}
 
 
-        # 模块 11：检查 QDQ
+        # 检查 QDQ
         # QuantizeLinear 和 DequantizeLinear 标记数值进出量化表示的边界；节点个数本身不能说明机器执行得更快。
-
-
         for node in model.graph.node:
             counts[node.op_type] = counts.get(node.op_type, 0) + 1
         # 安全检查：QDQ 格式的量化一定会生成这两种节点。
@@ -322,10 +303,9 @@ def main():
         # 不预热的话这部分"开机时间"会污染测速结果
 
 
-        # 模块 12：成对测量
+        # 成对测量
         # 同一帧给两个模型，预热移出统计，交替先后顺序。这样两组计时比较的是同一种输入负载。
-
-
+        # 先在同一份评估张量上拿到两套模型的输出，再逐元素相减。数值偏差能提示变化发生了，框和类别是否仍正确，还得用有标注的数据评分。
         for engine in engines.values():
             for _ in range(2):
                 engine.run(None, {name: evaluation[0]})

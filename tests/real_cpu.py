@@ -1,9 +1,7 @@
 # YOLO 检测部署 | tests/real_cpu.py
-# 用本机的真实 ONNX 和视频调用已编译的检测程序，检查顺序、流水线、丢帧和单图路径。
+# 功能：用本机的真实 ONNX 和视频调用已编译的检测程序，检查顺序、流水线、丢帧和单图路径。
 # 例如读入帧数应等于推理帧数加输入丢帧数；最后还向测试子进程发送 SIGINT 验证退出。
-#
-# 阅读地图（按源码顺序）
-#   1 核对完整处理 → 2 核对被丢弃的帧 → 3 信号场景
+# 目的：把队列、图像解码和真实推理连起来验收，检查合成测试看不到的协作问题。
 
 
 from pathlib import Path
@@ -17,10 +15,8 @@ def run(name,args,timeout=180):
     print(name,'passed',flush=True)
 
 
-# 模块 1：核对完整处理
+# 模块：核对完整处理
 # 顺序和流水线输入同样多的帧，阻塞模式下三段计数应一致。
-
-
 # 先固定阻塞队列，让读取、推理、输出都完成规定帧数，才具备比较两种运行模式的前提。
 for mode in ['sequential','pipeline']:
     name='real-'+mode
@@ -29,10 +25,9 @@ for mode in ['sequential','pipeline']:
     assert d['input_dropped']==d['result_dropped']==0;records.append(d)
 
 
-# 模块 2：核对被丢弃的帧
+# 模块：核对被丢弃的帧
 # 把两个队列分别算账，哪条队列丢了帧，差值就应出现在它自己的计数里。
-
-
+# DropOldest 的实际丢帧数取决于线程运行速度。回归更适合核对“读入、推理、显示和两处丢帧”的数量关系，固定要求每次都丢同样多的帧会让测试不可靠。
 run('real-drop',['--video','test.mp4','--queue-policy','drop-oldest','--queue-size','1','--report',str(out/'real-drop.json')])
 d=json.loads((out/'real-drop.json').read_text());assert d['read_frames']==d['inferred_frames']+d['input_dropped'];assert d['inferred_frames']==d['output_frames']+d['result_dropped'];records.append(d)
 with tempfile.TemporaryDirectory() as folder:
@@ -42,10 +37,8 @@ with tempfile.TemporaryDirectory() as folder:
     # A real worker shutdown test using only our own child process.
 
 
-    # 模块 3：信号场景
+    # 信号场景
     # 单独启动子进程，在它运行期间发信号；这样才能测线程能否退出，而不只是输入文件自然结束。
-
-
     with (out/'real-sigint.log').open('w') as log:
         p=subprocess.Popen(base+['--video','test.mp4','--queue-size','1'],cwd=r,stdout=log,stderr=log)
         time.sleep(2);assert p.poll() is None;p.send_signal(signal.SIGINT);code=p.wait(15);assert code==0

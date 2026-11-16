@@ -1,6 +1,7 @@
 # YOLO 检测部署 | tests/test_evaluation.py
-# 为 evaluate_detection.py 准备有已知答案的小样本。一个真值配一个完全重合的正确框，
+# 功能：为 evaluate_detection.py 准备有已知答案的小样本。一个真值配一个完全重合的正确框，
 # 与漏检、重复预测或错分类别比较，可以单独判断匹配和召回率计算有无偏差。
+# 目的：用能手算 AP 的小数据区分匹配错误、召回不足和输入格式错误。
 
 
 import copy
@@ -15,10 +16,9 @@ evaluation = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evaluation)
 
 
-# 模块 1：已知答案
+# 模块：已知答案（EvaluationTests）
 # 功能：用可手算的预测验收AP、重复框、错误类别和非法数据
-
-
+# setUp 里两张图各有一个同类真值。若只报对其中一张，最高召回率就是 1/2；0 到 0.50 含两端共 51 个采样点，所以即使这一个框很准，AP 也只能到 51/101。
 class EvaluationTests(unittest.TestCase):
     def setUp(self):
         self.dataset = {
@@ -65,6 +65,7 @@ class EvaluationTests(unittest.TestCase):
             dict(truths[7], score=0.4),
         ]
         # r=0.70的官方浮点网格略大于7/10，须取下一个召回位置；不能人为加epsilon。
+        # 10 个真值先命中 7 个，召回率是 7/10；第 70 格阈值在浮点数里略大于它，因此取更右侧的精确率 8/9。
         expected = (70 + 11 * (8 / 9)) / 101
         self.assertAlmostEqual(evaluation.class_ap(truths, predictions, 0.5), expected)
 

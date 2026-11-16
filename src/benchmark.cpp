@@ -1,10 +1,8 @@
 // YOLO 检测部署 | src/benchmark.cpp
-// 把许多次单帧计时变成一份分布报告。均值使用整个运行期的总和与次数；
+// 功能：把许多次单帧计时变成一份分布报告。均值使用整个运行期的总和与次数；
 // 分位数只对保留的近期样本排序，再在相邻位置之间按距离加权。
 // 例如保留窗口已满时，最旧的一帧会退出分位统计，它依然计入全程均值。
-//
-// 阅读地图（按源码顺序）
-//   1 样本记录 → 2 统计计算 → 3 指标展示
+// 目的：同时回答“全程平均一帧多久”和“近期慢帧有多慢”，限制第二个问题消耗的内存。
 
 
 #include "benchmark.h"  // 把多次计时样本汇总成均值和分位数
@@ -16,10 +14,8 @@
 #include <stdexcept>
 
 
-// 模块 1：样本记录
+// 模块：样本记录（Benchmark::record）
 // 功能：累计全程指标并维护有界分位样本
-
-
 void Benchmark::record(double latency_ms) {
     if (latency_ms < 0.0 || !std::isfinite(latency_ms)) {
         return;
@@ -40,10 +36,9 @@ void Benchmark::record(double latency_ms) {
 }
 
 
-// 模块 2：统计计算
+// 模块：统计计算（Benchmark::average）
 // 功能：提供均值、插值分位、极值和样本数量
-
-
+// 例如只记录 2、4、9 ms，全程均值是 5 ms，中位数是 4 ms。前者用 sum_ 和总次数，后者要知道样本排序后的中间位置。
 double Benchmark::average() const {
     return total_count_ ? sum_ / total_count_ : 0;
 }
@@ -100,10 +95,8 @@ size_t Benchmark::count() const {
 }
 
 
-// 模块 3：指标展示
+// 模块：指标展示（Benchmark::print）
 // 功能：打印当前阶段的延迟分布和耗时倒数
-
-
 void Benchmark::print(const char* name) const {
     std::cout << "\n========== Benchmark ==========" << std::endl;
 

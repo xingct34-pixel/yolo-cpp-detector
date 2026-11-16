@@ -15,10 +15,8 @@
 #include <stdexcept>
 
 
-// 模块 1：统计辅助
+// 模块：统计辅助
 // 功能：计算毫秒差并写入阶段统计
-
-
 namespace {
 using Clock = std::chrono::steady_clock;
 
@@ -33,12 +31,10 @@ void stats(cv::FileStorage& fs, const char* name, const Benchmark& b) {
 }
 
 
-// 模块 2：流水线初始化
+// 模块：流水线初始化（Pipeline::Pipeline）
 // 功能：创建两个有界队列和唯一检测器
 // 数据流：读取线程 -> frame_queue_ -> 单推理线程 -> result_queue_ -> 主线程消费。
 // detector_在Pipeline构造时加载一次；容量限制待处理帧数，不会提高最慢阶段的处理速度。
-
-
 Pipeline::Pipeline(const std::string& video,
                    const std::string& model,
                    const std::string& classes,
@@ -53,12 +49,10 @@ Pipeline::Pipeline(const std::string& video,
 }
 
 
-// 模块 3：异常与取消
+// 模块：异常与取消（Pipeline::requestStop）
 // 功能：保存错误，关闭队列并唤醒等待者
 // 异常/取消走快速停止：先记住首个异常、关闭并唤醒两个队列，再由run()汇合线程。
 // 与正常EOF逐级排空不同，此路径不保证处理完所有已读帧。
-
-
 void Pipeline::requestStop(std::exception_ptr error) {
     if (error) {
         std::lock_guard<std::mutex> lock(error_mutex_);
@@ -72,10 +66,8 @@ void Pipeline::requestStop(std::exception_ptr error) {
 }
 
 
-// 模块 4：读取阶段
+// 模块：读取阶段（Pipeline::readLoop）
 // 功能：解码视频，深拷贝当前帧后交给输入队列
-
-
 void Pipeline::readLoop() {
     cv::VideoCapture cap(video_path_);
     if (!cap.isOpened())
@@ -96,10 +88,9 @@ void Pipeline::readLoop() {
 }
 
 
-// 模块 5：阶段采样
+// 模块：阶段采样（Pipeline::collect）
 // 功能：收集检测器最近一帧的耗时
-
-
+// collect 在一次 detect 结束后读取该帧各阶段的计时。这能排查“模型慢还是前后处理慢”；想知道帧在进模型之前等了多久，要看 inferenceLoop 记录的队列等待时间。
 void Pipeline::collect() {
     inference_.record(detector_.last_inference_ms());
     preprocess_.record(detector_.last_preprocess_ms());
@@ -108,10 +99,8 @@ void Pipeline::collect() {
 }
 
 
-// 模块 6：推理阶段
+// 模块：推理阶段（Pipeline::inferenceLoop）
 // 功能：出队后在锁外检测，再投递结果
-
-
 void Pipeline::inferenceLoop() {
     FrameData data;
     // pop返回前已释放队列锁，耗时detect在锁外执行，读取线程可继续入队。
@@ -129,10 +118,8 @@ void Pipeline::inferenceLoop() {
 }
 
 
-// 模块 7：结果消费
+// 模块：结果消费（Pipeline::consume）
 // 功能：可选显示图片并记录端到端耗时
-
-
 void Pipeline::consume(ResultData& result) {
     if (options_.show) {
         cv::imshow("YOLO Result", result.frame);
@@ -145,10 +132,8 @@ void Pipeline::consume(ResultData& result) {
 }
 
 
-// 模块 8：消费循环
+// 模块：消费循环（Pipeline::display）
 // 功能：读取结果队列直到结束或取消
-
-
 void Pipeline::display() {
     ResultData result;
     while (!stop_requested_ && result_queue_.pop(result))
@@ -156,28 +141,22 @@ void Pipeline::display() {
 }
 
 
-// 模块 9：运行入口
+// 模块：运行入口（Pipeline::run）
 // 功能：预热，组织顺序模式或多线程模式
-
-
 void Pipeline::run() {
     if (options_.warmup < 0 || options_.max_frames < 0)
         throw std::invalid_argument("invalid pipeline limits");
 
 
-    // 模块 10：预热
+    // 预热
     // 功能：初始化计算路径，不纳入正式统计
     // 预热复用同一模型，但不record到阶段统计，也不计入下面的整体运行时间。
-
-
     for (int i = 0; i < options_.warmup; ++i)
         (void)detector_.detect(cv::Mat(640, 640, CV_8UC3, cv::Scalar{}));
 
 
-    // 模块 11：正式运行
+    // 正式运行
     // 功能：启动监视线程并选择执行模式
-
-
     auto begin = Clock::now();
     std::thread reader, infer, monitor;
     std::atomic<bool> finished{false};
@@ -232,11 +211,10 @@ void Pipeline::run() {
     }
 
 
-    // 模块 12：线程回收
+    // 线程回收
     // 功能：等待退出并重新抛出首个异常
     // join只等待线程结束，不会主动停止线程；异常时前面必须先关闭队列解除等待。
-
-
+    // 假设读线程已经退出，结果队列里还剩一帧：读线程已结束只说明不会再读新图。正常结束时仍要让后面的阶段消费这一帧，才能汇总最终数量。
     // joinable 表示这个对象还有线程需要回收，线程即使已经跑完也可能为真。join 等该线程结束并收回它。
     if (reader.joinable())
         reader.join();
@@ -251,11 +229,9 @@ void Pipeline::run() {
         std::rethrow_exception(error_);
 
 
-    // 模块 13：汇总报告
+    // 汇总报告
     // 功能：计算实际输出FPS和各阶段指标
     // 实际输出FPS=输出帧数/整段运行秒数；与1000/平均Run毫秒数的计时范围不同。
-
-
     // 真实输出 FPS 的分子是消费端实际处理的帧数；如果旧帧被丢弃，就不能拿读入帧数代替。
     double seconds = ms(begin, Clock::now()) / 1000.;
     std::cout << "读取帧数：" << read_count_ << "\n推理帧数：" << inference_count_ << "\n输出帧数："

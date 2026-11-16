@@ -1,6 +1,7 @@
 # YOLO 检测部署 | tests/test_quantization.py
-# 用人工生成的纯色图检查量化工具的 prepare。红色像素经转换应落在 RGB 的首通道，
+# 功能：用人工生成的纯色图检查量化工具的 prepare。红色像素经转换应落在 RGB 的首通道，
 # 灰色补边应为 114/255。先把输入核对好，才有依据解释 FP32 与 INT8 的输出偏差。
+# 目的：先用已知像素核对 Python 校准输入，避免通道或补边错误影响对量化效果的判断。
 
 
 """Optional preprocessing contract tests for the CPU quantization environment."""
@@ -27,10 +28,9 @@ class PreprocessingTests(unittest.TestCase):
         self.assertTrue(np.all(tensor[0, 1:] == 0))
 
 
-    # 模块 1：奇数尺寸缩放
+    # 模块：奇数尺寸缩放（test_letterbox_padding）
     # 检查 333×1000 图像缩放后的内容区和两侧灰色区域，逐通道核对像素值。
-
-
+    # 1000×333 的图缩到宽 640 时高约 213，剩下 427 行要补灰：上 213、下 214。三个切片分别核对上灰边、原图和下灰边，能抓出只偏一行的错误。
     # 奇数尺寸可以暴露四舍五入与上下补边相差一行的情况。
     def test_letterbox_padding(self):
         tensor = quant.prepare(np.zeros((333, 1000, 3), dtype=np.uint8))

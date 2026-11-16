@@ -1,7 +1,8 @@
 // YOLO 检测部署 | src/trt_backend.cpp
-// 这条可选 GPU 路径读取提前生成的 TensorRT engine。构造时分配缓冲并绑定地址，
+// 功能：这条可选 GPU 路径读取提前生成的 TensorRT engine。构造时分配缓冲并绑定地址，
 // 每帧把输入从主机复制到显存、提交推理，再把输出送回主机给 Detector。
 // 对应头文件为 trt_backend.h。实际速度和可用精度需要在兼容设备上测量。
+// 目的：让已构建的 Engine 能逐帧复用，明确每次推理在哪一步跨过主机与显存边界。
 //
 // 阅读顺序：准备日志与辅助函数 → 装载 Engine 并分配资源 → 绑定输入输出 → 复制、执行、取回结果。
 
@@ -17,10 +18,8 @@
 #include <vector>
 
 
-// 模块 1：TensorRT日志
+// 模块：TensorRT日志（TrtLogger::log）
 // 功能：输出后端警告和错误
-
-
 void TrtLogger::log(Severity severity, const char* msg) noexcept {
     if (severity <= Severity::kWARNING) {
         std::cout << "[TensorRT] " << msg << std::endl;
@@ -28,10 +27,8 @@ void TrtLogger::log(Severity severity, const char* msg) noexcept {
 }
 
 
-// 模块 2：工具函数
+// 模块：工具函数
 // 功能：计算固定形状的元素总数
-
-
 namespace {
 
 size_t getElementCount(const nvinfer1::Dims& dims) {
@@ -52,28 +49,20 @@ size_t getElementCount(const nvinfer1::Dims& dims) {
 }
 
 
-// 模块 3：构造初始化
+// 模块：构造初始化（TrtBackend::TrtBackend）
 // 功能：准备后端执行所需的资源
-
-
 TrtBackend::TrtBackend(const std::string& engine_path) {
 
 
-    // 模块 4：Engine 加载
-
-
+    // Engine 加载
     loadEngine(engine_path);
 
 
-    // 模块 5：Tensor 信息
-
-
+    // Tensor 信息
     inspectTensors();
 
 
-    // 模块 6：CUDA Stream
-
-
+    // CUDA Stream
     // 同一条 CUDA 流中的操作保持提交顺序；主机线程在异步提交返回时不能就认为输出已经就绪。
     cudaError_t err = cudaStreamCreate(&stream_);
 
@@ -83,18 +72,14 @@ TrtBackend::TrtBackend(const std::string& engine_path) {
     }
 
 
-    // 模块 7：CUDA Buffer
-
-
+    // CUDA Buffer
     allocateBuffers();
 
 
-    // 模块 8：Tensor 地址绑定
+    // Tensor 地址绑定
     //
     // 把 TensorRT 的输入输出 Tensor
     // 连接到我们申请的 GPU Buffer。
-
-
     // 绑定的是显存地址。后续提交推理时，引擎根据张量名在这些地址读输入、写输出。
     context_->setTensorAddress(input_name_.c_str(), device_input_);
 
@@ -103,10 +88,8 @@ TrtBackend::TrtBackend(const std::string& engine_path) {
 }
 
 
-// 模块 9：资源回收
+// 模块：资源回收（TrtBackend::~TrtBackend）
 // 功能：释放GPU缓冲和执行流
-
-
 TrtBackend::~TrtBackend() {
     releaseBuffers();
 
@@ -118,10 +101,8 @@ TrtBackend::~TrtBackend() {
 }
 
 
-// 模块 10：Engine加载
+// 模块：Engine加载（TrtBackend::loadEngine）
 // 功能：读取执行计划并创建Runtime和Context
-
-
 void TrtBackend::loadEngine(const std::string& engine_path) {
     std::ifstream file(engine_path, std::ios::binary);
 
@@ -164,10 +145,8 @@ void TrtBackend::loadEngine(const std::string& engine_path) {
 }
 
 
-// 模块 11：Tensor信息
+// 模块：Tensor信息（TrtBackend::inspectTensors）
 // 功能：保存输入输出的名称、形状和元素数量
-
-
 void TrtBackend::inspectTensors() {
     const int tensor_count = engine_->getNbIOTensors();
 
@@ -211,9 +190,7 @@ void TrtBackend::inspectTensors() {
 }
 
 
-// 模块 12：CUDA 内存管理模块
-
-
+// 模块：CUDA 内存管理模块（TrtBackend::allocateBuffers）
 void TrtBackend::allocateBuffers() {
     // 输入输出空间按元素数乘以每个元素的字节数申请。与读 dims 时的“维数”是两种量。
     cudaError_t err;
@@ -254,9 +231,7 @@ void TrtBackend::releaseBuffers() {
 }
 
 
-// 模块 13：TensorRT 推理模块
-
-
+// 模块：TensorRT 推理模块（TrtBackend::infer）
 std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
     if (input_data.size() != input_elements_) {
         throw std::runtime_error("TensorRT 输入数据大小不匹配。");
@@ -265,12 +240,11 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
     std::vector<float> output(output_elements_);
 
 
-    // 模块 14：H2D
+    // H2D
     //
     // H2D（仓库 → 工厂）
     // CPU 内存 → GPU 显存
-
-
+    // 输入 vector 的地址属于主机，TensorRT 的输入绑定指向显存。H2D 填入本帧数据，推理写输出显存，D2H 才把结果送回能供 C++ 解码的 vector。三步沿同一条 stream 排队。
     // 从主机把这次输入传到 GPU，再执行引擎，最后把结果传回能由 C++ vector 访问的主机内存。
     cudaError_t err = cudaMemcpyAsync(device_input_,
                                       input_data.data(),
@@ -283,13 +257,11 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
     }
 
 
-    // 模块 15：TensorRT 执行
+    // TensorRT 执行
     //
     // Engine（生产线）
     // Context（本次任务）
     // Stream（传送带）
-
-
     auto start = std::chrono::steady_clock::now();
 
     if (!context_->enqueueV3(stream_)) {
@@ -309,12 +281,10 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
     last_latency_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
 
-    // 模块 16：D2H
+    // D2H
     //
     // D2H（工厂 → 仓库）
     // GPU 显存 → CPU 内存
-
-
     err = cudaMemcpyAsync(output.data(),
                           device_output_,
                           output_elements_ * sizeof(float),
@@ -335,19 +305,15 @@ std::vector<float> TrtBackend::infer(const std::vector<float>& input_data) {
 }
 
 
-// 模块 17：计时查询
+// 模块：计时查询（TrtBackend::last_latency_ms）
 // 功能：返回最近一次后端调用统计
-
-
 double TrtBackend::last_latency_ms() const {
     return last_latency_ms_;
 }
 
 
-// 模块 18：后端识别
+// 模块：后端识别（TrtBackend::name）
 // 功能：返回当前实现的名称
-
-
 std::string TrtBackend::name() const {
     return "TensorRT";
 }
