@@ -2,24 +2,35 @@
 # YOLO 检测部署 | bench/ort_profile.py
 # 离线读取 ONNX Runtime 写出的 Profile 时间线，按算子和执行后端累加 kernel_time。
 # 同一个运行里还含会话与其他事件；只挑节点执行事件，才不会把嵌套耗时重复相加。
+#
+# 阅读地图（按源码顺序）
+#   1 算子归档 → 2 筛选事件 → 3 报告入口
 
 
 """Summarize an existing ORT JSON profile; node sums are not end-to-end latency."""
-import argparse
-import collections
-import json
-from pathlib import Path
+import argparse  # 读取命令行输入并检查参数格式
+import collections  # 分组、计数等容器工具
+import json  # 在 Python 对象和 JSON 文本之间转换
+from pathlib import Path  # 拼接目录、文件名并读取文件
 
 
-# 模块：算子归档：只计kernel_time事件，按实际算子和执行后端汇总
+# 模块 1：算子归档
+# 功能：只计kernel_time事件，按实际算子和执行后端汇总
 
 
 def summarize(events):
     groups = collections.defaultdict(lambda: {'calls': 0, 'duration_us': 0.0})
     for event in events:
+
+
+        # 模块 2：筛选事件
+        # 同一次 Run 会同时留下会话、节点等记录。只汇总节点 kernel_time，避免把一次计算重复相加。
+
+
         if event.get('cat') != 'Node' or not event.get('name', '').endswith('_kernel_time'):
             continue
         args = event.get('args', {})
+        # 同名 Conv 如果分别由 CPU 和 CUDA 执行，就进两个桶；累计时间和调用次数可以一起看。
         key = (args.get('op_name', 'unknown'), args.get('provider', 'unknown'))
         groups[key]['calls'] += 1
         groups[key]['duration_us'] += float(event.get('dur', 0))
@@ -30,7 +41,8 @@ def summarize(events):
     )
 
 
-# 模块：报告入口：只读分析Profile文件，保留原始Chrome Trace以便查看时间线
+# 模块 3：报告入口
+# 功能：只读分析Profile文件，保留原始Chrome Trace以便查看时间线
 
 
 def main():

@@ -2,16 +2,24 @@
 // 每帧视频在这里经历读取、检测、输出。读取端复制当前画面送入第一条队列；
 // 推理端取出后调用 Detector，结果进入第二条队列，消费端取走结果做显示或统计。
 // 读并发路径时跟着同一帧看两次 push/pop，再看视频读完后 close 怎样一路传下去。
+//
+// 阅读地图（按源码顺序）
+//   1 统计辅助 → 2 流水线初始化 → 3 异常与取消
+//   4 读取阶段 → 5 阶段采样 → 6 推理阶段
+//   7 结果消费 → 8 消费循环 → 9 运行入口
+//   10 预热 → 11 正式运行 → 12 线程回收
+//   13 汇总报告
 
 
-#include "pipeline.h"
+#include "pipeline.h"  // 视频帧、处理选项和各线程之间的交接接口
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <thread>
+#include <thread>  // 创建线程及等待线程退出
 #include <stdexcept>
 
 
-// 模块：统计辅助：计算毫秒差并写入阶段统计
+// 模块 1：统计辅助
+// 功能：计算毫秒差并写入阶段统计
 
 
 namespace {
@@ -28,7 +36,8 @@ void stats(cv::FileStorage& fs, const char* name, const Benchmark& b) {
 }
 
 
-// 模块：流水线初始化：创建两个有界队列和唯一检测器
+// 模块 2：流水线初始化
+// 功能：创建两个有界队列和唯一检测器
 // 数据流：读取线程 -> frame_queue_ -> 单推理线程 -> result_queue_ -> 主线程消费。
 // detector_在Pipeline构造时加载一次；容量限制待处理帧数，不会提高最慢阶段的处理速度。
 
@@ -47,7 +56,8 @@ Pipeline::Pipeline(const std::string& video,
 }
 
 
-// 模块：异常与取消：保存错误，关闭队列并唤醒等待者
+// 模块 3：异常与取消
+// 功能：保存错误，关闭队列并唤醒等待者
 // 异常/取消走快速停止：先记住首个异常、关闭并唤醒两个队列，再由run()汇合线程。
 // 与正常EOF逐级排空不同，此路径不保证处理完所有已读帧。
 
@@ -55,6 +65,7 @@ Pipeline::Pipeline(const std::string& video,
 void Pipeline::requestStop(std::exception_ptr error) {
     if (error) {
         std::lock_guard<std::mutex> lock(error_mutex_);
+        // 只保留第一个异常。后面线程因为队列已关闭而退出时，不会盖掉真正的起因。
         if (!error_)
             error_ = error;
     }
@@ -64,7 +75,8 @@ void Pipeline::requestStop(std::exception_ptr error) {
 }
 
 
-// 模块：读取阶段：解码视频，深拷贝当前帧后交给输入队列
+// 模块 4：读取阶段
+// 功能：解码视频，深拷贝当前帧后交给输入队列
 
 
 void Pipeline::readLoop() {
@@ -78,6 +90,7 @@ void Pipeline::readLoop() {
         // VideoCapture会复用image缓冲，clone使入队帧拥有独立像素；move只转交对象，不替代深拷贝。
         FrameData data{id++, image.clone(), Clock::now()};
         ++read_count_;
+        // data 移入输入队列后，由推理线程取走。push 返回 false 表示交接失败，读取方应停止继续投递。
         if (!frame_queue_.push(std::move(data)))
             break;
     }
@@ -86,7 +99,8 @@ void Pipeline::readLoop() {
 }
 
 
-// 模块：阶段采样：收集检测器最近一帧的耗时
+// 模块 5：阶段采样
+// 功能：收集检测器最近一帧的耗时
 
 
 void Pipeline::collect() {
@@ -97,7 +111,8 @@ void Pipeline::collect() {
 }
 
 
-// 模块：推理阶段：出队后在锁外检测，再投递结果
+// 模块 6：推理阶段
+// 功能：出队后在锁外检测，再投递结果
 
 
 void Pipeline::inferenceLoop() {
@@ -108,6 +123,7 @@ void Pipeline::inferenceLoop() {
         auto image = detector_.detect(data.frame);
         ++inference_count_;
         collect();
+        // 同一帧的 captured 一路传到输出端。这样端到端耗时会包括中间排队的时间。
         if (!result_queue_.push({data.frame_id, std::move(image), data.captured}))
             break;
     }
@@ -116,7 +132,8 @@ void Pipeline::inferenceLoop() {
 }
 
 
-// 模块：结果消费：可选显示图片并记录端到端耗时
+// 模块 7：结果消费
+// 功能：可选显示图片并记录端到端耗时
 
 
 void Pipeline::consume(ResultData& result) {
@@ -131,7 +148,8 @@ void Pipeline::consume(ResultData& result) {
 }
 
 
-// 模块：消费循环：读取结果队列直到结束或取消
+// 模块 8：消费循环
+// 功能：读取结果队列直到结束或取消
 
 
 void Pipeline::display() {
@@ -141,7 +159,8 @@ void Pipeline::display() {
 }
 
 
-// 模块：运行入口：预热，组织顺序模式或多线程模式
+// 模块 9：运行入口
+// 功能：预热，组织顺序模式或多线程模式
 
 
 void Pipeline::run() {
@@ -149,7 +168,8 @@ void Pipeline::run() {
         throw std::invalid_argument("invalid pipeline limits");
 
 
-    // 模块：1. 预热：初始化计算路径，不纳入正式统计
+    // 模块 10：预热
+    // 功能：初始化计算路径，不纳入正式统计
     // 预热复用同一模型，但不record到阶段统计，也不计入下面的整体运行时间。
 
 
@@ -157,7 +177,8 @@ void Pipeline::run() {
         (void)detector_.detect(cv::Mat(640, 640, CV_8UC3, cv::Scalar{}));
 
 
-    // 模块：2. 正式运行：启动监视线程并选择执行模式
+    // 模块 11：正式运行
+    // 功能：启动监视线程并选择执行模式
 
 
     auto begin = Clock::now();
@@ -192,6 +213,7 @@ void Pipeline::run() {
                 consume(data);
             }
         } else {
+            // [&] 让线程函数访问当前作用域里的对象。run 返回前要等线程退出，避免线程继续使用已离开作用域的数据。
             reader = std::thread([&] {
                 try {
                     readLoop();
@@ -213,10 +235,12 @@ void Pipeline::run() {
     }
 
 
-    // 模块：3. 线程回收：等待退出并重新抛出首个异常
+    // 模块 12：线程回收
+    // 功能：等待退出并重新抛出首个异常
     // join只等待线程结束，不会主动停止线程；异常时前面必须先关闭队列解除等待。
 
 
+    // joinable 表示这个对象还有线程需要回收，线程即使已经跑完也可能为真。join 等该线程结束并收回它。
     if (reader.joinable())
         reader.join();
     if (infer.joinable())
@@ -230,10 +254,12 @@ void Pipeline::run() {
         std::rethrow_exception(error_);
 
 
-    // 模块：4. 汇总报告：计算实际输出FPS和各阶段指标
+    // 模块 13：汇总报告
+    // 功能：计算实际输出FPS和各阶段指标
     // 实际输出FPS=输出帧数/整段运行秒数；与1000/平均Run毫秒数的计时范围不同。
 
 
+    // 真实输出 FPS 的分子是消费端实际处理的帧数；如果旧帧被丢弃，就不能拿读入帧数代替。
     double seconds = ms(begin, Clock::now()) / 1000.;
     std::cout << "读取帧数：" << read_count_ << "\n推理帧数：" << inference_count_ << "\n输出帧数："
               << display_count_ << "\nPipeline FPS："

@@ -2,15 +2,24 @@
 # YOLO 检测部署 | scripts/check.sh
 # 本地构建与测试入口。根据 release 或 sanitize 找到对应构建目录和现有 ORT，
 # 依次配置 CMake、编译和运行 CTest，失败时可以按阶段查看 results 下的日志。
+#
+# 阅读地图（按源码顺序）
+#   1 构建模式 → 2 定位 ORT → 3 配置与验证
 
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+
+# 模块 1：构建模式
+# release 和 sanitize 用不同的目录；不会把调试选项误用到发布版产物上。
+
+
 mode="${1:-release}"
 case "$mode" in release) build=build-local; kind=Release; sanitize=OFF;; sanitize) build=build-local-sanitize; kind=Debug; sanitize=ON;; *) echo 'release or sanitize required' >&2; exit 2;; esac
 
 
-# 模块：定位 ORT
+# 模块 2：定位 ORT
 # 头文件用于编译，动态库用于链接和运行。优先采用调用者指定的安装路径。
 
 
@@ -22,6 +31,12 @@ if [[ -z "$runtime" ]]; then
 fi
 if [[ -z "$runtime" ]]; then echo 'Set ONNXRUNTIME_ROOT to an existing ONNX Runtime directory.' >&2; exit 2; fi
 mkdir -p results
+
+
+# 模块 3：配置与验证
+# 配置阶段定位头文件和库，构建阶段生成二进制，CTest 调用前面注册的测试；各阶段日志分别保留。
+
+
 cmake -S . -B "$build" -DCMAKE_BUILD_TYPE="$kind" -DENABLE_TENSORRT=OFF -DENABLE_SANITIZERS="$sanitize" -DONNXRUNTIME_ROOT="$runtime" >"results/configure-$mode.log" 2>&1
 cmake --build "$build" -j2 >"results/build-$mode.log" 2>&1
 ctest --test-dir "$build" --output-on-failure | tee "results/test-$mode.log"

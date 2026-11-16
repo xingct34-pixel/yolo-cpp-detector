@@ -1,12 +1,15 @@
 # YOLO 检测部署 | tests/test_evaluation.py
 # 为 evaluate_detection.py 准备有已知答案的小样本。一个真值配一个完全重合的正确框，
 # 与漏检、重复预测或错分类别比较，可以单独判断匹配和召回率计算有无偏差。
+#
+# 阅读地图（按源码顺序）
+#   1 已知答案
 
 
 import copy
-import importlib.util
-from pathlib import Path
-import unittest
+import importlib.util  # 按文件路径装载被测模块或检查依赖
+from pathlib import Path  # 拼接目录、文件名并读取文件
+import unittest  # 组织测试用例并核对预期结果
 
 spec = importlib.util.spec_from_file_location(
     'evaluation', Path(__file__).resolve().parents[1] / 'tools/evaluate_detection.py'
@@ -15,7 +18,8 @@ evaluation = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evaluation)
 
 
-# 模块：已知答案：用可手算的预测验收AP、重复框、错误类别和非法数据
+# 模块 1：已知答案
+# 功能：用可手算的预测验收AP、重复框、错误类别和非法数据
 
 
 class EvaluationTests(unittest.TestCase):
@@ -35,6 +39,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(evaluation.evaluate(self.dataset, [])['AP50'], 0)
 
     def test_half_recall_and_false_positive(self):
+        # 两个真值只检出一个，最高召回率是 0.5；101 个采样点从 0 到 0.5 一共有 51 个，所以 AP 是 51/101。
         self.assertAlmostEqual(
             evaluation.evaluate(self.dataset, self.predictions[:1])['AP50'], 51 / 101
         )
@@ -46,6 +51,7 @@ class EvaluationTests(unittest.TestCase):
     def test_class_and_iou(self):
         wrong = [dict(p, category_id=2) for p in self.predictions]
         self.assertEqual(evaluation.evaluate(self.dataset, wrong)['AP50'], 0)
+        # 把 10×10 的框横移两像素，IoU 介于 0.5 和 0.75 之间，同一预测应通过 AP50 而通不过 AP75 的匹配门槛。
         shifted = [dict(p, bbox=[2, 0, 10, 10]) for p in self.predictions]
         result = evaluation.evaluate(self.dataset, shifted)
         self.assertEqual(result['AP50'], 1)

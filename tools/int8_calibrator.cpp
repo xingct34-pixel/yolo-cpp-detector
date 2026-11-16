@@ -2,14 +2,19 @@
 // 给实验性 TensorRT INT8 构建准备校准数据。校准器把样本图片整理成批次，
 // 构建器通过回调取到 GPU 输入地址，并可把校准结果保存下来供以后读取。
 // 这里与 cpu_quantize.py 的 CPU 静态量化是两条独立路径。
+//
+// 阅读地图（按源码顺序）
+//   1 校准初始化 → 2 校准清理 → 3 图片枚举
+//   4 图片预处理 → 5 校准批次交接 → 6 缓存读取
+//   7 缓存保存
 
 
 #include "int8_calibrator.h"
 
 #include <opencv2/opencv.hpp>
 
-#include <algorithm>
-#include <filesystem>
+#include <algorithm>  // 排序、查找、取最大最小值等标准算法
+#include <filesystem>  // 读取路径组成、拼接目录或检查文件
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -35,7 +40,8 @@ bool isImageFile(const fs::path& path) {
 }
 
 
-// 模块：校准初始化：读取图片清单并分配批次缓冲（实验路径）
+// 模块 1：校准初始化
+// 功能：读取图片清单并分配批次缓冲（实验路径）
 
 
 YoloInt8Calibrator::YoloInt8Calibrator(const std::string& image_dir,
@@ -66,6 +72,7 @@ YoloInt8Calibrator::YoloInt8Calibrator(const std::string& image_dir,
         throw std::runtime_error("INT8 校准目录中没有找到图片: " + image_dir);
     }
 
+    // batch_elements_ 是浮点数个数，乘 sizeof(float) 才是申请显存的字节数。
     cudaError_t err = cudaMalloc(&device_input_, batch_elements_ * sizeof(float));
 
     if (err != cudaSuccess) {
@@ -77,7 +84,8 @@ YoloInt8Calibrator::YoloInt8Calibrator(const std::string& image_dir,
 }
 
 
-// 模块：校准清理：释放本对象持有的GPU缓冲
+// 模块 2：校准清理
+// 功能：释放本对象持有的GPU缓冲
 
 
 YoloInt8Calibrator::~YoloInt8Calibrator() {
@@ -88,7 +96,8 @@ YoloInt8Calibrator::~YoloInt8Calibrator() {
 }
 
 
-// 模块：图片枚举：筛选并排序校准输入
+// 模块 3：图片枚举
+// 功能：筛选并排序校准输入
 
 
 void YoloInt8Calibrator::loadImagePaths(const std::string& image_dir) {
@@ -110,7 +119,8 @@ void YoloInt8Calibrator::loadImagePaths(const std::string& image_dir) {
 }
 
 
-// 模块：图片预处理：生成校准批次需要的浮点输入
+// 模块 4：图片预处理
+// 功能：生成校准批次需要的浮点输入
 
 
 bool YoloInt8Calibrator::preprocessImage(const std::string& image_path, float* output) {
@@ -126,6 +136,7 @@ bool YoloInt8Calibrator::preprocessImage(const std::string& image_path, float* o
         std::min(static_cast<float>(input_width_) / static_cast<float>(image.cols),
                  static_cast<float>(input_height_) / static_cast<float>(image.rows));
 
+    // 这里将浮点尺寸截成整数；和 CPU prepare_yolo 里的 round 要分开看，奇数尺寸的结果可能差一像素。
     const int new_width = static_cast<int>(image.cols * scale);
 
     const int new_height = static_cast<int>(image.rows * scale);
@@ -140,6 +151,7 @@ bool YoloInt8Calibrator::preprocessImage(const std::string& image_path, float* o
 
     const int pad_y = (input_height_ - new_height) / 2;
 
+    // 先用 114 灰色填满目标图，再选中心矩形写入缩小的原图。矩形外的区域自然保留灰色补边。
     resized.copyTo(letterbox(cv::Rect(pad_x, pad_y, new_width, new_height)));
 
     cv::Mat rgb;
@@ -160,6 +172,7 @@ bool YoloInt8Calibrator::preprocessImage(const std::string& image_path, float* o
     for (int c = 0; c < 3; ++c) {
         const float* src = channels[c].ptr<float>();
 
+        // 一个平面大小是高×宽，三个平面按 R、G、B 顺序相接。c=1 时写入从第二个平面开头开始的位置。
         float* dst = output + static_cast<size_t>(c) * plane_size;
 
         std::copy(src, src + plane_size, dst);
@@ -173,10 +186,11 @@ int YoloInt8Calibrator::getBatchSize() const noexcept {
 }
 
 
-// 模块：校准批次交接
+// 模块 5：校准批次交接
 // 构建器调用一次就索取一批。bindings 是用来交还设备缓冲地址的位置。
 
 
+// 输入图像先装进主机批次，再整批复制到设备；bindings 交回的是设备地址。
 bool YoloInt8Calibrator::getBatch(void* bindings[], const char* names[], int nbBindings) noexcept {
     if (nbBindings != 1 || bindings == nullptr) {
         return false;
@@ -209,9 +223,11 @@ bool YoloInt8Calibrator::getBatch(void* bindings[], const char* names[], int nbB
 }
 
 
-// 模块：缓存读取：为构建器提供已有校准结果（实验路径）
+// 模块 6：缓存读取
+// 功能：为构建器提供已有校准结果（实验路径）
 
 
+// 返回的字节指针指向本对象保存的数据，不能指向马上析构的局部容器。
 const void* YoloInt8Calibrator::readCalibrationCache(std::size_t& length) noexcept {
     calibration_cache_.clear();
 
@@ -245,7 +261,8 @@ const void* YoloInt8Calibrator::readCalibrationCache(std::size_t& length) noexce
 }
 
 
-// 模块：缓存保存：接收构建器回调并把校准结果写入文件（实验路径）
+// 模块 7：缓存保存
+// 功能：接收构建器回调并把校准结果写入文件（实验路径）
 
 
 void YoloInt8Calibrator::writeCalibrationCache(const void* cache, std::size_t length) noexcept {

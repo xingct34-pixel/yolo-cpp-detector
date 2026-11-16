@@ -2,19 +2,23 @@
 // validate_coco8.py 调用本文件编出的 yolo_coco_predict，按标注清单逐张读取原图。
 // 复用与主程序相同的预处理、OrtBackend 和框解码，把预测写成 COCO 格式的 JSON。
 // 每条记录的图像 ID、类别 ID 和原图坐标，是评估器与真值配对的依据。
+//
+// 阅读地图（按源码顺序）
+//   1 精度数据导出程序（yolo_coco_predict） → 2 输入清单 → 3 整理类别表
+//   4 名字复核 → 5 逐图推理 → 6 逐图导出
 
 
-#include "ort_backend.h"
-#include "yolo_processing.h"
+#include "ort_backend.h"  // 让 C++ 程序通过 ONNX Runtime 执行一次模型推理
+#include "yolo_processing.h"  // 共享的 letterbox 几何信息、框解码和绘制接口
 #include <opencv2/imgcodecs.hpp>
-#include <filesystem>
+#include <filesystem>  // 读取路径组成、拼接目录或检查文件
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
-#include <algorithm>
+#include <algorithm>  // 排序、查找、取最大最小值等标准算法
 
 
-// 模块：精度数据导出程序（yolo_coco_predict）
+// 模块 1：精度数据导出程序（yolo_coco_predict）
 // 作用：加载一次 ONNX 模型，对数据集里每张图做推理，把检测框按 COCO 格式写入 predictions.json，
 //       供前面的 Python 脚本计算 AP。预处理和后处理直接复用项目主程序的代码，保证测的就是实际部署的流程。
 // 参数：标注 JSON、图片根目录、ONNX 模型、类别名文件、输出 JSON。
@@ -25,6 +29,12 @@
 int main(int argc, char** argv) {
     try {
         // 参数个数必须正好 6 个（程序名 + 5 个参数），否则打印用法并报错
+
+
+        // 模块 2：输入清单
+        // argv[0] 是程序名，后面五项依次是标注、图片目录、模型、类别表和预测输出。少一项就无法知道去哪读或写。
+
+
         if (argc != 6)
             throw std::invalid_argument(
                 "usage: yolo_coco_predict annotations.json images_root model.onnx classes.txt predictions.json");
@@ -33,11 +43,18 @@ int main(int argc, char** argv) {
         if (!dataset.isOpened())
             throw std::runtime_error("cannot read annotations");
         // 取出标注文件里所有类别的 ID，排序后用于"模型类别序号 → COCO 类别 ID"的映射
+
+
+        // 模块 3：整理类别表
+        // 假设三类的标注 ID 是 1、3、7。模型的下标 0、1、2 要依次映射到它们，不能直接把下标当作标注 ID。
+
+
         std::vector<int> category_ids;
         for (const auto& row : dataset["categories"])
             category_ids.push_back(int(row["id"]));
         std::sort(category_ids.begin(), category_ids.end());
         // 必须正好 80 个，且没有重复（adjacent_find 在已排序数组里找相邻相等元素）
+        // 排序后重复的 ID 一定相邻。adjacent_find 返回 end() 表示一直找到结尾都没有重复。
         if (category_ids.size() != 80 ||
             std::adjacent_find(category_ids.begin(), category_ids.end()) != category_ids.end())
             throw std::runtime_error(
@@ -59,6 +76,12 @@ int main(int argc, char** argv) {
             throw std::runtime_error("requires 80 class names");
         // 逐类核对：标注里第 i 小的类别 ID，其名字必须等于类别名文件第 i 行。
         // 通俗讲：模型输出的是"第几类"，这里确保"第几类"和标注里的类别名对得上，防止张冠李戴
+
+
+        // 模块 4：名字复核
+        // lower_bound 找到 ID 所在的位置。假设 ID=3，它在 [1,3,7] 的中间；减去 begin() 得到下标 1，再用名字表的第 1 项核对。
+
+
         for (const auto& category : dataset["categories"]) {
             const auto position =
                 std::lower_bound(category_ids.begin(), category_ids.end(), int(category["id"]));
@@ -67,7 +90,8 @@ int main(int argc, char** argv) {
                 throw std::runtime_error(
                     "dataset category order/names disagree with model classes");
         }
-        // 加载模型，只加载一次，后面所有图片复用；第二个参数 false 的具体含义取决于 OrtBackend 的定义
+        // 加载模型，只加载一次，后面所有图片复用；false 对应 use_cuda，这里使用 CPU 路径
+        // 这一步在图片循环外：构造一次，后续每张图共享同一个模型会话。
         OrtBackend backend(argv[3], false);
         // 打开输出文件，开始写 JSON：先写阈值参数，再开一个 predictions 数组
         cv::FileStorage output(argv[5], cv::FileStorage::WRITE | cv::FileStorage::FORMAT_JSON);
@@ -78,12 +102,18 @@ int main(int argc, char** argv) {
         const auto root = std::filesystem::canonical(argv[2]);
 
 
-        // 模块：逐图推理
+        // 模块 5：逐图推理
         // 作用：对每张图执行 读取 → 预处理 → 推理 → 解码 → 写出结果。
         //       禁止图片路径越出根目录；坐标还原和按类别 NMS 与主程序完全相同。
 
 
         for (const auto& row : dataset["images"]) {
+
+
+            // 模块 6：逐图导出
+            // image_id 负责对图，category_id 负责对类，bbox 负责对位置。任何一个对应错了，评分器都可能把正确的检测记成误报。
+
+
             const std::string name = row["file_name"];
             const auto path = std::filesystem::canonical(root / name);
             // 路径安全检查：算出相对根目录的路径，如果以 ".." 开头说明跑到根目录外面去了，
@@ -91,10 +121,12 @@ int main(int argc, char** argv) {
             const auto relative = path.lexically_relative(root);
             if (relative.empty() || *relative.begin() == "..")
                 throw std::runtime_error("image path escapes dataset root");
+            // imread 把磁盘图片解码为 cv::Mat。image.cols 是每行像素数（宽），image.rows 是总行数（高）。
             const auto image = cv::imread(path.string());
             if (image.empty())
                 throw std::runtime_error("cannot decode dataset image");
             // 标注里记录的宽高必须与实际图片一致，否则框的坐标换算会错
+            // 尺寸写错时，两个框虽指向同一个物体，却可能使用不同的像素尺度。
             if (int(row["width"]) != image.cols || int(row["height"]) != image.rows)
                 throw std::runtime_error("annotation image size mismatch");
             // info 记录缩放比例和填充量，后处理时要靠它把框还原到原图坐标
@@ -106,9 +138,12 @@ int main(int argc, char** argv) {
             const auto raw = backend.infer(input);
             // 后处理：按 0.001 的分数门槛筛选，按类别做 NMS（IoU 阈值 0.45），
             // 并把框从 640×640 空间还原到原图坐标
+            // info 随这张图传到 decode_yolo。以左右补边为例，解码要先减去左侧补边再除以实际横向缩放倍数。
             const auto detections = decode_yolo(raw, image.size(), info, 0.001f, 0.45f);
             // 把每个检测框写成 COCO 预测格式
+            // 遍历一张图的最终检测记录。const auto& 给当前记录起一个只读别名，不复制整个 Detection。
             for (const auto& detection : detections) {
+                // 对照一条结果读：同张图的多个框共享 image_id，每个框则各有自己的位置、类别号和置信分。
                 output << "{" << "image_id" << int(row["id"])
                        // 模型输出的是 0~79 的类别序号，这里映射回 COCO 的真实类别 ID
                        << "category_id" << category_ids.at(size_t(detection.class_id))

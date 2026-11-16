@@ -2,17 +2,24 @@
 // 把一帧浮点输入送进 ONNX Runtime。启动时检查模型约定，记住输入输出名称；
 // infer 用调用方的数据包装输入 Tensor，执行 Session::Run，再把输出复制到 vector。
 // 复制后即使这次 Run 的临时结果被释放，Detector 仍可以拿这些数字解码候选框。
+//
+// 阅读地图（按源码顺序）
+//   1 Session配置 → 2 可选性能诊断 → 3 CUDA Execution Provider 模块
+//   4 构造初始化 → 5 模型约定 → 6 推理模块
+//   7 输入包装 → 8 推理执行 → 9 输出读取
+//   10 计时查询 → 11 后端识别
 
 
-#include "ort_backend.h"
+#include "ort_backend.h"  // 让 C++ 程序通过 ONNX Runtime 执行一次模型推理
 #include <cstdlib>
 
-#include <chrono>
+#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
 #include <iostream>
 #include <stdexcept>
 
 
-// 模块：Session配置：设置CPU线程数和可选执行后端
+// 模块 1：Session配置
+// 功能：设置CPU线程数和可选执行后端
 
 
 Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
@@ -25,6 +32,7 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
         char* end = nullptr;
         const long parsed = std::strtol(env_value, &end, 10);
 
+        // 例如输入 4abc，strtol 能读出开头的 4，但 end 仍指着 a。检查末尾字符才能拒绝这种半截合法的输入。
         if (end == env_value || *end != 0 || parsed < 1 || parsed > 64) {
             throw std::invalid_argument(
                 "YOLO_ORT_INTRA_OP_THREADS must be an integer from 1 to 64.");
@@ -36,7 +44,8 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
     options.SetIntraOpNumThreads(intra_op_threads);
 
 
-    // 模块：可选性能诊断：默认保持ORT优化级别，显式指定时校验参数再开启
+    // 模块 2：可选性能诊断
+    // 功能：默认保持ORT优化级别，显式指定时校验参数再开启
     // Profile会增加测量开销；其结果用于定位算子，正式延迟报告应关闭Profile重新测量。
 
 
@@ -63,7 +72,7 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
     std::cout << "ONNX Runtime intra-op threads: " << intra_op_threads << std::endl;
 
 
-    // 模块：CUDA Execution Provider 模块
+    // 模块 3：CUDA Execution Provider 模块
     //
     // CUDA Execution Provider
     // = GPU 推理执行后端
@@ -84,7 +93,8 @@ Ort::SessionOptions OrtBackend::makeSessionOptions(bool use_cuda) {
 }
 
 
-// 模块：构造初始化：准备后端执行所需的资源
+// 模块 4：构造初始化
+// 功能：准备后端执行所需的资源
 
 
 OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
@@ -92,7 +102,8 @@ OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
       session_(env_, model_path.c_str(), makeSessionOptions(use_cuda)) {
 
 
-    // 模块：模型约定：查询名称、类型和形状并拒绝不匹配模型
+    // 模块 5：模型约定
+    // 功能：查询名称、类型和形状并拒绝不匹配模型
 
 
     Ort::AllocatorWithDefaultOptions allocator;
@@ -102,6 +113,7 @@ OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
     auto output_name = session_.GetOutputNameAllocated(0, allocator);
 
     // 保存到std::string中：allocator管理的临时名称退出作用域后，成员名称仍有效。
+    // 把分配器交回的名字存成成员字符串。局部名字对象离开构造函数后，这个副本仍能用于下一帧。
     input_name_ = input_name.get();
 
     output_name_ = output_name.get();
@@ -132,13 +144,14 @@ OrtBackend::OrtBackend(const std::string& model_path, bool use_cuda)
 }
 
 
-// 模块：推理模块
+// 模块 6：推理模块
 
 
 std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
 
 
-    // 模块：输入包装：描述CPU内存并创建借用数组的Tensor
+    // 模块 7：输入包装
+    // 功能：描述CPU内存并创建借用数组的Tensor
     //
     // Tensor（输入货物）
     //
@@ -146,6 +159,7 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
     // CUDA Execution Provider 会负责后续的数据传输。
 
 
+    // 这里数的是元素：3 个颜色平面，每个 640×640。描述形状的数组只有 4 个元素，两种 size 不能互换。
     if (input_data.size() != 3u * 640 * 640)
         throw std::invalid_argument("invalid YOLO input size");
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -163,7 +177,8 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
     const char* output_names[] = {output_name_.c_str()};
 
 
-    // 模块：推理执行：按名称绑定数据并测量同步Run调用
+    // 模块 8：推理执行
+    // 功能：按名称绑定数据并测量同步Run调用
     //
     // Runtime（工厂管理系统）
     // Session（执行环境）
@@ -174,6 +189,7 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
     // CUDA路径还可能含EP管理的数据传输，这不是单独GPU kernel耗时，也未在本机验收。
     auto start = std::chrono::steady_clock::now();
 
+    // Run 按名字配对输入与输出。计时从调用前到返回后，稍后的 vector 拷贝不在这段时间里。
     auto outputs =
         session_.Run(Ort::RunOptions{nullptr}, input_names, &input_tensor, 1, output_names, 1);
 
@@ -182,13 +198,15 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
     last_latency_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
 
-    // 模块：输出读取：检查Tensor形状并复制结果到自有数组
+    // 模块 9：输出读取
+    // 功能：检查Tensor形状并复制结果到自有数组
 
 
     if (outputs.empty()) {
         throw std::runtime_error("ONNX Runtime 没有返回输出。");
     }
 
+    // 指针指进本次 outputs 的缓冲区；调用方要带走结果，必须在 outputs 析构前拷到自己的容器里。
     float* output_data = outputs[0].GetTensorMutableData<float>();
 
     auto output_info = outputs[0].GetTensorTypeAndShapeInfo();
@@ -207,7 +225,8 @@ std::vector<float> OrtBackend::infer(const std::vector<float>& input_data) {
 }
 
 
-// 模块：计时查询：返回最近一次后端调用统计
+// 模块 10：计时查询
+// 功能：返回最近一次后端调用统计
 
 
 double OrtBackend::last_latency_ms() const {
@@ -215,7 +234,8 @@ double OrtBackend::last_latency_ms() const {
 }
 
 
-// 模块：后端识别：返回当前实现的名称
+// 模块 11：后端识别
+// 功能：返回当前实现的名称
 
 
 std::string OrtBackend::name() const {

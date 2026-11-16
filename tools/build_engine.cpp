@@ -2,24 +2,29 @@
 // 离线把 ONNX 网络转换成 TensorRT 可加载的执行计划。输入包含模型路径、精度和构建选项；
 // 选用需要校准的 INT8 路径时，由 int8_calibrator 提供代表性图片。
 // 序列化后的文件才会交给 TrtBackend。构建与逐帧推理发生在不同阶段。
+//
+// 阅读地图（按源码顺序）
+//   1 构建日志 → 2 构建配置 → 3 帮助输出
+//   4 参数解析 → 5 产物保存 → 6 构建入口
 
 
 #include "int8_calibrator.h"
 
-#include <NvInfer.h>
+#include <NvInfer.h>  // TensorRT 构建网络和执行推理的类型
 #include <NvOnnxParser.h>
 
 #include <cstdint>
 #include <cstdlib>
-#include <filesystem>
+#include <filesystem>  // 读取路径组成、拼接目录或检查文件
 #include <fstream>
 #include <iostream>
-#include <memory>
+#include <memory>  // 智能指针管理资源归属与释放时机
 #include <stdexcept>
 #include <string>
 
 
-// 模块：构建日志：输出TensorRT警告及错误（实验路径）
+// 模块 1：构建日志
+// 功能：输出TensorRT警告及错误（实验路径）
 
 
 class BuildLogger : public nvinfer1::ILogger {
@@ -32,9 +37,11 @@ public:
 };
 
 
-// 模块：构建配置：记录模型、精度、校准数据与工作空间
+// 模块 2：构建配置
+// 功能：记录模型、精度、校准数据与工作空间
 
 
+// ONNX 是网络描述，engine 是按当前 TensorRT 和目标设备构建的执行计划；这是两个不同的文件。
 struct BuildConfig {
     std::string onnx_path;
     std::string engine_path;
@@ -52,7 +59,8 @@ struct BuildConfig {
 };
 
 
-// 模块：帮助输出：说明Engine构建工具的命令行参数
+// 模块 3：帮助输出
+// 功能：说明Engine构建工具的命令行参数
 
 
 static void printUsage(const char* program) {
@@ -73,7 +81,8 @@ static void printUsage(const char* program) {
 }
 
 
-// 模块：参数解析：读取并校验构建所需选项
+// 模块 4：参数解析
+// 功能：读取并校验构建所需选项
 
 
 static BuildConfig parseArguments(int argc, char* argv[]) {
@@ -91,6 +100,7 @@ static BuildConfig parseArguments(int argc, char* argv[]) {
             throw std::runtime_error("参数缺少值: " + arg);
         }
 
+        // 一个带值的选项会消费两个命令行位置：例如 --precision int8。先检查后面还有元素，再向前移动下标。
         const std::string value = argv[++i];
 
         if (arg == "--onnx")
@@ -111,6 +121,7 @@ static BuildConfig parseArguments(int argc, char* argv[]) {
             throw std::runtime_error("未知参数: " + arg);
     }
 
+    // ONNX 路径决定读哪个网络，engine 路径决定写到哪里。两项都齐全才能开始构建。
     if (config.onnx_path.empty() || config.engine_path.empty()) {
         throw std::runtime_error("--onnx 和 --engine 是必需参数。");
     }
@@ -131,7 +142,8 @@ static BuildConfig parseArguments(int argc, char* argv[]) {
 }
 
 
-// 模块：产物保存：把序列化Engine写入目标文件
+// 模块 5：产物保存
+// 功能：把序列化Engine写入目标文件
 // 将构建后的 Engine（二进制推理执行计划）保存到磁盘。
 
 
@@ -157,9 +169,11 @@ static void saveEngine(const std::string& path, const nvinfer1::IHostMemory& ser
 }
 
 
-// 模块：构建入口：解析ONNX，配置精度并生成Engine（未在本机验收）
+// 模块 6：构建入口
+// 功能：解析ONNX，配置精度并生成Engine（未在本机验收）
 
 
+// 这里的工作发生在部署之前。运行视频时加载已经保存的 engine，无需每帧重新解析 ONNX。
 int main(int argc, char* argv[]) {
     try {
         const BuildConfig config = parseArguments(argc, argv);
@@ -196,6 +210,7 @@ int main(int argc, char* argv[]) {
         // 3. Parser：读取 ONNX 文件，并将其转换为 TensorRT 网络定义。
         std::unique_ptr<nvonnxparser::IParser> parser(nvonnxparser::createParser(*network, logger));
 
+        // 解析器的职责是读 ONNX 网络；构建配置随后决定可用精度、工作空间，最后才生成可保存的 engine。
         if (!parser) {
             throw std::runtime_error("createParser 失败。");
         }
@@ -225,6 +240,7 @@ int main(int argc, char* argv[]) {
 
         const size_t workspace_bytes = config.workspace_gb * 1024ULL * 1024ULL * 1024ULL;
 
+        // 工作空间设置的是构建策略可用的预算，不能当作整个应用的实际显存占用报告。
         builder_config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, workspace_bytes);
 
         // 5. 按指定精度配置构建选项。

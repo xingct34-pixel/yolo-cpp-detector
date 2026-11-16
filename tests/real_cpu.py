@@ -1,9 +1,12 @@
 # YOLO 检测部署 | tests/real_cpu.py
 # 用本机的真实 ONNX 和视频调用已编译的检测程序，检查顺序、流水线、丢帧和单图路径。
 # 例如读入帧数应等于推理帧数加输入丢帧数；最后还向测试子进程发送 SIGINT 验证退出。
+#
+# 阅读地图（按源码顺序）
+#   1 核对完整处理 → 2 核对被丢弃的帧 → 3 信号场景
 
 
-from pathlib import Path
+from pathlib import Path  # 拼接目录、文件名并读取文件
 import subprocess,json,os,hashlib,tempfile,signal,time
 r=Path(__file__).resolve().parents[1];out=r/'results';out.mkdir(exist_ok=True);exe=r/'build-local/yolo_detector'
 base=[str(exe),'--model','models/yolo11n.onnx','--classes','data/coco.txt','--headless','--warmup','2']
@@ -14,10 +17,11 @@ def run(name,args,timeout=180):
     print(name,'passed',flush=True)
 
 
-# 模块：核对完整处理
+# 模块 1：核对完整处理
 # 顺序和流水线输入同样多的帧，阻塞模式下三段计数应一致。
 
 
+# 先固定阻塞队列，让读取、推理、输出都完成规定帧数，才具备比较两种运行模式的前提。
 for mode in ['sequential','pipeline']:
     name='real-'+mode
     run(name,['--video','test.mp4','--mode',mode,'--max-frames','30','--queue-size','2','--report',str(out/(name+'.json'))])
@@ -25,7 +29,7 @@ for mode in ['sequential','pipeline']:
     assert d['input_dropped']==d['result_dropped']==0;records.append(d)
 
 
-# 模块：核对被丢弃的帧
+# 模块 2：核对被丢弃的帧
 # 把两个队列分别算账，哪条队列丢了帧，差值就应出现在它自己的计数里。
 
 
@@ -36,6 +40,12 @@ with tempfile.TemporaryDirectory() as folder:
     run('real-image',['--image',str(image),'--output',str(folder/'output.png'),'--report',str(out/'real-image.json')])
     assert (folder/'output.png').stat().st_size>0;records.append(json.loads((out/'real-image.json').read_text()))
     # A real worker shutdown test using only our own child process.
+
+
+    # 模块 3：信号场景
+    # 单独启动子进程，在它运行期间发信号；这样才能测线程能否退出，而不只是输入文件自然结束。
+
+
     with (out/'real-sigint.log').open('w') as log:
         p=subprocess.Popen(base+['--video','test.mp4','--queue-size','1'],cwd=r,stdout=log,stderr=log)
         time.sleep(2);assert p.poll() is None;p.send_signal(signal.SIGINT);code=p.wait(15);assert code==0

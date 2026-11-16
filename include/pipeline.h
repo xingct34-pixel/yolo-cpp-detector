@@ -2,19 +2,24 @@
 // 声明视频处理的三个角色和它们传递的数据。帧编号、图片与采集时间一起向下游走，
 // 这样显示结果时还能算出这张图从采集完成到输出经历了多久。
 // 两个 ThreadSafeQueue 分别连接读取与推理、推理与结果消费。执行顺序见 pipeline.cpp。
+//
+// 阅读地图（按源码顺序）
+//   1 运行配置 → 2 输入记录 → 3 输出记录
+//   4 Pipeline接口 → 5 内部状态
 
 
 #pragma once
-#include "benchmark.h"
-#include "detector.h"
-#include "thread_safe_queue.h"
-#include <atomic>
-#include <chrono>
+#include "benchmark.h"  // 把多次计时样本汇总成均值和分位数
+#include "detector.h"  // 单帧检测入口，调用它即可走完预处理、推理和绘图
+#include "thread_safe_queue.h"  // 线程之间通过这个有界队列传递数据
+#include <atomic>  // 让跨线程共享的计数或标志以原子方式访问
+#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
 #include <exception>
-#include <mutex>
+#include <mutex>  // 访问共享数据前加锁，离开临界区再让出锁
 
 
-// 模块：运行配置：选择显示、预热、队列策略及外部停止标志
+// 模块 1：运行配置
+// 功能：选择显示、预热、队列策略及外部停止标志
 
 
 struct PipelineOptions {
@@ -26,9 +31,11 @@ struct PipelineOptions {
 };
 
 
-// 模块：输入记录：携带帧编号、独立图片和采集完成时间
+// 模块 2：输入记录
+// 功能：携带帧编号、独立图片和采集完成时间
 
 
+// 读取线程记录捕获时刻。传给推理线程的不仅有像素，还有之后计算等待时间所需的时钟值。
 struct FrameData {
     int frame_id = 0;
     cv::Mat frame;
@@ -36,9 +43,11 @@ struct FrameData {
 };
 
 
-// 模块：输出记录：携带检测图片并保留原始帧时间
+// 模块 3：输出记录
+// 功能：携带检测图片并保留原始帧时间
 
 
+// 结果保留原帧编号。若允许丢帧，编号仍能说明画面来自哪一帧。
 struct ResultData {
     int frame_id = 0;
     cv::Mat frame;
@@ -46,7 +55,8 @@ struct ResultData {
 };
 
 
-// 模块：Pipeline接口：组织读取、推理和结果消费三个角色
+// 模块 4：Pipeline接口
+// 功能：组织读取、推理和结果消费三个角色
 
 
 class Pipeline {
@@ -70,7 +80,8 @@ private:
     void consume(ResultData&);
 
 
-    // 模块：内部状态：队列、检测器、退出控制和阶段统计
+    // 模块 5：内部状态
+    // 功能：队列、检测器、退出控制和阶段统计
 
 
     ThreadSafeQueue<FrameData> frame_queue_;

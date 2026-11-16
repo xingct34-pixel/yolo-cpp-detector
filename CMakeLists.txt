@@ -2,6 +2,11 @@
 # CMake 用本文件把源文件、头文件和推理库连成可执行程序及测试目标。
 # 先看 ONNXRUNTIME_ROOT 怎样定位头文件与动态库，再看 yolo_detector 组合了哪些 .cpp；
 # TensorRT 工具和部分 Python 验收由相应构建选项决定是否加入。
+#
+# 阅读地图（按源码顺序）
+#   1 定位依赖 → 2 核心源文件 → 3 离线构建工具
+#   4 可选 Python 测试 → 5 已知输入测试 → 6 精度与算子诊断
+#   7 官方评估交叉验证
 
 
 cmake_minimum_required(VERSION 3.18)
@@ -45,6 +50,11 @@ set(TENSORRT_ROOT
 # 基础依赖
 # ============================================================
 
+
+# 模块 1：定位依赖
+# 编译器要读头文件，链接器要找到库。找到 OpenCV 并不表示 ONNX Runtime 的路径也有效。
+
+
 find_package(OpenCV REQUIRED)
 
 find_package(Threads REQUIRED)
@@ -86,7 +96,7 @@ find_library(
 # ============================================================
 
 
-# 模块：核心源文件
+# 模块 2：核心源文件
 # 图片与视频共用这组实现，选中 TensorRT 时才追加对应源文件。
 
 
@@ -222,6 +232,11 @@ endif()
 #   ↓
 # Engine（已经建好的生产线）
 
+
+# 模块 3：离线构建工具
+# 解析 ONNX 生成 TensorRT engine 需要额外的 parser 库；CPU 检测程序无需这个目标。
+
+
 if(ENABLE_TENSORRT)
 
     find_path(
@@ -307,7 +322,7 @@ message(STATUS "")
 include(CTest)
 
 
-# 模块：可选 Python 测试
+# 模块 4：可选 Python 测试
 # 把安装了量化依赖的解释器显式交给 CTest，才能实际导入 ORT 等库。
 
 
@@ -381,6 +396,12 @@ if(BUILD_TESTING)
 endif()
 
 if(BUILD_TESTING)
+
+
+    # 模块 5：已知输入测试
+    # 直接将处理代码和测试编成小程序，可单测预处理和解码而不加载整张网络。
+
+
     add_executable(yolo_processing_test tests/test_processing.cpp src/yolo_processing.cpp)
     target_include_directories(yolo_processing_test PRIVATE include ${OpenCV_INCLUDE_DIRS})
     target_link_libraries(yolo_processing_test PRIVATE ${OpenCV_LIBS})
@@ -410,7 +431,8 @@ if(BUILD_TESTING)
 endif()
 
 
-# 模块：精度与算子诊断：标准库评估测试和复用现有CPU后端的COCO预测导出器
+# 模块 6：精度与算子诊断
+# 功能：标准库评估测试和复用现有CPU后端的COCO预测导出器
 
 
 add_executable(yolo_coco_predict tools/coco_predict.cpp src/ort_backend.cpp src/yolo_processing.cpp)
@@ -428,7 +450,8 @@ if(BUILD_TESTING)
 endif()
 
 
-# 模块：官方评估交叉验证：可选的项目Python环境，不触发下载或系统安装
+# 模块 7：官方评估交叉验证
+# 功能：可选的项目Python环境，不触发下载或系统安装
 
 
 if(BUILD_TESTING AND YOLO_QUANT_PYTHON)

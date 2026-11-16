@@ -43,7 +43,7 @@ from tools.evaluate_detection import evaluate
 # 功能：把外部准备好的 COCO8 验证集（4 张图片 + YOLO 格式标注）转成 COCO 标注格式，
 #       同时给每张图算一个"预处理后内容的指纹"。只读本地文件，不下载、不伪造真值。
 # 目的：评估工具只认 COCO 格式，所以必须先翻译；指纹则用来在后面证明
-#       "考试用的图"和"量化校准用的图"不是同一批。
+#       "考试用的图"和"量化校准用的图"没有内容完全相同的张量。
 # 通俗讲：YOLO 和 COCO 是两种"标注记账方式"，就像同一笔账，一个用"中心点+比例"记，
 #         一个用"左上角+像素"记，这里负责把账本重新抄一遍。
 
@@ -61,7 +61,7 @@ def convert(dataset, names):
         height, width = image.shape[:2]
         images.append({'id': index, 'file_name': path.name, 'width': width, 'height': height})
         # 计算"预处理后张量"的哈希。后面用它和校准数据的哈希对比，
-        # 目的是确认评估用的图和量化校准用的图不是同一批内容（避免自己考自己）
+        # 目的是确认评估用的图和量化校准用的图没有完全相同的预处理张量；近似画面仍可能非常相似
         hashes[path.name] = hashlib.sha256(prepare(image).tobytes()).hexdigest()
         # 读取同名的 .txt 标注文件，一行一个目标
         for line in (
@@ -131,7 +131,7 @@ def official_ap(dataset, predictions):
         evaluator.accumulate()  # 汇总出精度-召回曲线
         evaluator.summarize()  # 计算最终指标，结果存在 evaluator.stats 里
     # stats[0]：IoU 从 0.5 到 0.95 的平均 AP（最常引用的 mAP）
-    # stats[1]：IoU=0.5 时的 AP（要求宽松：框重叠一半就算对）
+    # stats[1]：IoU=0.5 时的 AP（要求宽松：交集面积至少达到并集面积的一半才满足这个 IoU 门槛）
     # stats[2]：IoU=0.75 时的 AP（要求严格：框要贴得很准才算对）
     return {
         'mAP50_95': float(evaluator.stats[0]),

@@ -1,25 +1,32 @@
 # YOLO 检测部署 | bench/native_resources.py
 # 通过真实命令行交替执行前后两个版本的程序或模型，同时记录耗时和进程资源。
 # 哈希值标识这一轮实际测的输入与程序，方便把读到的数字和对应版本对上。
+#
+# 阅读地图（按源码顺序）
+#   1 原生资源测量 → 2 文件校验 → 3 执行入口
+#   4 对照组 → 5 成对运行 → 6 采样对象
+#   7 帧数守恒
 
 
-# 模块：原生资源测量：对比真实C++入口的速度及进程内存
+# 模块 1：原生资源测量
+# 功能：对比真实C++入口的速度及进程内存
 
 
 """Alternating before/after CPU measurements through the actual C++ CLI."""
-import argparse
-import hashlib
-import json
+import argparse  # 读取命令行输入并检查参数格式
+import hashlib  # 按文件或字节内容计算指纹
+import json  # 在 Python 对象和 JSON 文本之间转换
 import os
-from pathlib import Path
-import signal
-import subprocess
-import time
+from pathlib import Path  # 拼接目录、文件名并读取文件
+import signal  # 向子进程传递退出信号
+import subprocess  # 启动外部程序，获取输出或退出码
+import time  # 记录时间、设置等待间隔或截止时刻
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-# 模块：文件校验：计算输入或程序摘要
+# 模块 2：文件校验
+# 功能：计算输入或程序摘要
 
 
 def digest(path):
@@ -30,7 +37,8 @@ def digest(path):
     return hasher.hexdigest()
 
 
-# 模块：执行入口：读取参数并组织该工具的完整流程
+# 模块 3：执行入口
+# 功能：读取参数并组织该工具的完整流程
 
 
 def main():
@@ -48,6 +56,12 @@ def main():
     if args.output.exists():
         parser.error('choose a new output directory')
     args.output.mkdir(parents=True)
+
+
+    # 模块 4：对照组
+    # before 和 after 先用同一模型来比较程序改变；可选 int8 再用 after 程序单独比较模型改变。
+
+
     cases = [
         ('before', args.before_binary.resolve(), args.model.resolve()),
         ('after', args.after_binary.resolve(), args.model.resolve()),
@@ -65,7 +79,7 @@ def main():
     try:
 
 
-        # 模块：成对运行
+        # 模块 5：成对运行
         # 每轮都运行两个候选，保留各轮原始记录，方便查看波动。
 
 
@@ -101,6 +115,12 @@ def main():
                     )
                     started = time.monotonic()
                     try:
+
+
+                        # 模块 6：采样对象
+                        # 用子进程 PID 读 /proc，得到被测程序的内存。若读取的是当前 Python 进程，数字就属于压测工具。
+
+
                         while process.poll() is None:
                             if time.monotonic() - started > 300:
                                 raise TimeoutError('native benchmark exceeded 300 seconds')
@@ -125,6 +145,12 @@ def main():
                     if process.returncode:
                         raise RuntimeError(f'{name} exited {process.returncode}')
                 result = json.loads(result_path.read_text())
+
+
+                # 模块 7：帧数守恒
+                # 报告必须同时满足读取、推理、输出三项计数；只有返回码 0 还不能说明整段视频都处理了。
+
+
                 if not all(
                     result[key] == args.frames
                     for key in ('read_frames', 'inferred_frames', 'output_frames')

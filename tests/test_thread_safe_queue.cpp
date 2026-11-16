@@ -1,19 +1,22 @@
 // YOLO 检测部署 | tests/test_thread_safe_queue.cpp
 // 用整数代替视频帧检验线程队列。容量 2 依次压入 1、2、3，可以直接看出丢了谁；
 // 再安排线程等在空队列或满队列上，检查 close 能否唤醒它们以及剩余数据是否可取。
+//
+// 阅读地图（按源码顺序）
+//   1 等空队列 → 2 关后排空 → 3 满队列上的退出
 
 
-#include "thread_safe_queue.h"
+#include "thread_safe_queue.h"  // 线程之间通过这个有界队列传递数据
 
-#include <atomic>
+#include <atomic>  // 让跨线程共享的计数或标志以原子方式访问
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
 #include <cassert>
-#include <chrono>
+#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
 #include <iostream>
 #include <stdexcept>
-#include <thread>
+#include <thread>  // 创建线程及等待线程退出
 
 int main()
 {
@@ -45,6 +48,12 @@ int main()
     std::cout << "[通过] 满队列策略与关闭后的读写行为\n";
 
     // 3. close() 必须唤醒正在等待数据的消费者。
+
+
+    // 模块 1：等空队列
+    // 让消费者先阻塞，再从别的线程关闭队列；如果忘记通知，测试会一直等不到线程结束。
+
+
     ThreadSafeQueue<int> waiting_queue(1);
     std::atomic<bool> consumer_finished{false};
 
@@ -66,13 +75,19 @@ int main()
     // 4. 关闭后仍应允许消费者排空已有数据。
     ThreadSafeQueue<int> drain_queue(2);
     assert(drain_queue.push(42));
+
+
+    // 模块 2：关后排空
+    // 已经入队的元素仍然要能取走。关闭表示禁止继续生产，已有元素仍归消费者。
+
+
     drain_queue.close();
     assert(drain_queue.pop(item) && item == 42);
     assert(!drain_queue.pop(item));
     std::cout << "[通过] 关闭队列可排空已有数据\n";
 
 
-    // 模块：满队列上的退出
+    // 模块 3：满队列上的退出
     // 先占满唯一空位让生产者等待，再 close，检查它能否退出。
 
 

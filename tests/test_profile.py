@@ -1,11 +1,14 @@
 # YOLO 检测部署 | tests/test_profile.py
 # 构造短小的 ORT 时间线，交给 bench/ort_profile.py 的 summarize 汇总。
 # 把同类算子放在不同后端，并混入其他事件，检验报告会正确分组和筛选。
+#
+# 阅读地图（按源码顺序）
+#   1 Profile口径 → 2 模拟耗时
 
 
-import importlib.util
-from pathlib import Path
-import unittest
+import importlib.util  # 按文件路径装载被测模块或检查依赖
+from pathlib import Path  # 拼接目录、文件名并读取文件
+import unittest  # 组织测试用例并核对预期结果
 
 spec = importlib.util.spec_from_file_location(
     'profile_report', Path(__file__).resolve().parents[1] / 'bench/ort_profile.py'
@@ -14,7 +17,8 @@ profile = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(profile)
 
 
-# 模块：Profile口径：排除Session总计和fence事件，避免把同一耗时重复相加
+# 模块 1：Profile口径
+# 功能：排除Session总计和fence事件，避免把同一耗时重复相加
 
 
 class ProfileTests(unittest.TestCase):
@@ -33,6 +37,12 @@ class ProfileTests(unittest.TestCase):
                 'args': {'op_name': 'Conv', 'provider': 'CPUExecutionProvider'},
             },
             {'cat': 'Node', 'name': 'a_fence_before', 'dur': 1000},
+
+
+            # 模块 2：模拟耗时
+            # Session 事件的 1000 不应算进节点。两个 CPU Conv 的 10+20 应算 30，另一个 provider 单独保留。
+
+
             {'cat': 'Session', 'name': 'model_run', 'dur': 1000},
             {
                 'cat': 'Node',

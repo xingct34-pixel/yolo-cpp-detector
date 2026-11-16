@@ -1,6 +1,9 @@
 # YOLO 检测部署 | tests/test_invalid_video.cmake
 # 给检测程序一个明确不存在的视频路径，检查退出码和报错里是否含有这个路径。
 # 这让 CTest 可以区分“成功报告读视频失败”和“程序在更早的地方意外退出”。
+#
+# 阅读地图（按源码顺序）
+#   1 准备其他有效输入 → 2 触发读视频错误 → 3 错误定位
 
 
 if(NOT DEFINED YOLO_EXECUTABLE OR
@@ -14,6 +17,11 @@ set(missing_video "/tmp/yolo_cpp_detector_missing_input_test.mp4")
 if(EXISTS "${missing_video}")
     message(FATAL_ERROR "测试视频路径意外存在：${missing_video}")
 endif()
+
+
+# 模块 1：准备其他有效输入
+# 模型和类别表先确认存在，让接下来这一次失败能归因到视频路径。
+
 
 if(EXISTS "${PROJECT_ROOT}/models/yolo11n.onnx")
     set(test_model "${PROJECT_ROOT}/models/yolo11n.onnx")
@@ -35,7 +43,7 @@ if(DEFINED ENV{LD_LIBRARY_PATH} AND
 endif()
 
 
-# 模块：触发读视频错误
+# 模块 2：触发读视频错误
 # 模型和类别表准备好之后才传入缺失的视频，避免被更早的错误挡住。
 
 
@@ -61,6 +69,11 @@ if(NOT "${exit_code}" STREQUAL "1")
     message(FATAL_ERROR
         "预期退出码为 1，实际为 '${exit_code}'。\n${output}")
 endif()
+
+
+# 模块 3：错误定位
+# 错误消息必须指出那个不存在的文件，便于使用者找到出问题的输入。
+
 
 string(FIND "${output}" "${missing_video}" path_position)
 if(path_position EQUAL -1)

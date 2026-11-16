@@ -2,18 +2,22 @@
 // 把许多次单帧计时变成一份分布报告。均值使用整个运行期的总和与次数；
 // 分位数只对保留的近期样本排序，再在相邻位置之间按距离加权。
 // 例如保留窗口已满时，最旧的一帧会退出分位统计，它依然计入全程均值。
+//
+// 阅读地图（按源码顺序）
+//   1 样本记录 → 2 统计计算 → 3 指标展示
 
 
-#include "benchmark.h"
+#include "benchmark.h"  // 把多次计时样本汇总成均值和分位数
 
-#include <algorithm>
+#include <algorithm>  // 排序、查找、取最大最小值等标准算法
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
 
 
-// 模块：样本记录：累计全程指标并维护有界分位样本
+// 模块 1：样本记录
+// 功能：累计全程指标并维护有界分位样本
 
 
 void Benchmark::record(double latency_ms) {
@@ -28,6 +32,7 @@ void Benchmark::record(double latency_ms) {
     maximum_ = std::max(maximum_, latency_ms);
     sum_ += latency_ms;
     ++total_count_;
+    // 样本未满直接追加；满了按下标循环覆盖。sum_ 和 total_count_ 仍记录整个运行期，分位数使用最近的样本。
     if (latencies_.size() < 10000)
         latencies_.push_back(latency_ms);
     else
@@ -35,7 +40,8 @@ void Benchmark::record(double latency_ms) {
 }
 
 
-// 模块：统计计算：提供均值、插值分位、极值和样本数量
+// 模块 2：统计计算
+// 功能：提供均值、插值分位、极值和样本数量
 
 
 double Benchmark::average() const {
@@ -51,11 +57,13 @@ double Benchmark::percentile(double p) const {
         throw std::invalid_argument("percentile must be between 0 and 1.");
     }
 
+    // 排序的是副本。直接重排原数组会打乱环形缓冲下次要覆盖的位置。
     std::vector<double> values = latencies_;
 
     std::sort(values.begin(), values.end());
 
     // 排序后按p*(n-1)定位，相邻样本之间线性插值；P95描述延迟尾部，不是平均值。
+    // 若 5 个排序耗时为 10、20、30、40、50 ms，P95 的下标是 0.95×4=3.8，插值给出 48 ms。
     const double index = p * static_cast<double>(values.size() - 1);
 
     const size_t lower = static_cast<size_t>(index);
@@ -92,7 +100,8 @@ size_t Benchmark::count() const {
 }
 
 
-// 模块：指标展示：打印当前阶段的延迟分布和耗时倒数
+// 模块 3：指标展示
+// 功能：打印当前阶段的延迟分布和耗时倒数
 
 
 void Benchmark::print(const char* name) const {

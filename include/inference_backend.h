@@ -2,6 +2,10 @@
 // Detector 通过这个共同接口调用不同推理库。输入是已经排好顺序的浮点数，
 // 返回的还是模型原始数字，画框之前要交给 decode_yolo 解释。
 // infer 后面的 = 0 要求具体后端提供实现。CPU 路径可以接着看 OrtBackend::infer。
+//
+// 阅读地图（按源码顺序）
+//   1 统一后端接口 → 2 推理模块 → 3 性能统计模块
+//   4 后端信息模块
 
 
 //规定推理后端必须提供哪些功能
@@ -9,10 +13,11 @@
 #pragma once
 
 #include <string>
-#include <vector>
+#include <vector>  // 元素连续存放，适合装浮点张量或一组检测记录
 
 
-// 模块：统一后端接口：约定推理、计时和名称查询方法
+// 模块 1：统一后端接口
+// 功能：约定推理、计时和名称查询方法
 //
 // InferenceBackend：推理后端的统一“插座”
 //
@@ -20,12 +25,13 @@
 // Detector 不需要关心底层到底使用哪个推理框架。
 
 
+// Detector 持有基类指针。一次 detect 可以通过同一行 infer 调到 ORT，也可以调到编译启用的 TensorRT。
 class InferenceBackend {
 public:
     virtual ~InferenceBackend() = default;
 
 
-    // 模块：推理模块
+    // 模块 2：推理模块
     //
     // 输入：
     //   已经完成预处理的 CHW float 数据
@@ -37,15 +43,16 @@ public:
     virtual std::vector<float> infer(const std::vector<float>& input_data) = 0;
 
 
-    // 模块：性能统计模块
+    // 模块 3：性能统计模块
     //
     // 返回最近一次推理耗时
 
 
+    // const 表示查询上次记录的耗时；这个调用本身不会重新跑一遍模型。
     virtual double last_latency_ms() const = 0;
 
 
-    // 模块：后端信息模块
+    // 模块 4：后端信息模块
     //
     // 例如：
     //   "ONNX Runtime"

@@ -1,14 +1,17 @@
 # YOLO 检测部署 | tests/test_quantization.py
 # 用人工生成的纯色图检查量化工具的 prepare。红色像素经转换应落在 RGB 的首通道，
 # 灰色补边应为 114/255。先把输入核对好，才有依据解释 FP32 与 INT8 的输出偏差。
+#
+# 阅读地图（按源码顺序）
+#   1 奇数尺寸缩放
 
 
 """Optional preprocessing contract tests for the CPU quantization environment."""
-import importlib.util
-from pathlib import Path
-import unittest
+import importlib.util  # 按文件路径装载被测模块或检查依赖
+from pathlib import Path  # 拼接目录、文件名并读取文件
+import unittest  # 组织测试用例并核对预期结果
 
-import numpy as np
+import numpy as np  # 存放张量并按形状、通道进行数组计算
 
 spec = importlib.util.spec_from_file_location('cpu_quantize', Path(__file__).resolve().parents[1] / 'tools/cpu_quantize.py')
 quant = importlib.util.module_from_spec(spec)
@@ -18,6 +21,7 @@ spec.loader.exec_module(quant)
 class PreprocessingTests(unittest.TestCase):
     def test_rgb_and_normalization(self):
         image = np.zeros((640, 640, 3), dtype=np.uint8)
+        # 造出纯红色像素，检查它最终落到模型的红色平面；如果 BGR 和 RGB 没有对调，形状检查仍会通过。
         image[:, :, 2] = 255
         tensor = quant.prepare(image)
         self.assertEqual(tensor.shape, (1, 3, 640, 640))
@@ -26,16 +30,18 @@ class PreprocessingTests(unittest.TestCase):
         self.assertTrue(np.all(tensor[0, 1:] == 0))
 
 
-    # 模块：奇数尺寸缩放
+    # 模块 1：奇数尺寸缩放
     # 检查 333×1000 图像缩放后的内容区和两侧灰色区域，逐通道核对像素值。
 
 
+    # 奇数尺寸可以暴露四舍五入与上下补边相差一行的情况。
     def test_letterbox_padding(self):
         tensor = quant.prepare(np.zeros((333, 1000, 3), dtype=np.uint8))
         np.testing.assert_allclose(tensor[0, :, :213], 114 / 255, atol=1e-7)
         self.assertTrue(np.all(tensor[0, :, 213:426] == 0))
         np.testing.assert_allclose(tensor[0, :, 426:], 114 / 255, atol=1e-7)
 
+    # None、没有颜色通道和空高度都不能表示有效的 BGR 输入，测试分别检查这三条拒绝路径。
     def test_invalid_input(self):
         for image in (None, np.zeros((2, 2)), np.zeros((0, 2, 3), dtype=np.uint8)):
             with self.subTest(shape=getattr(image, 'shape', None)):

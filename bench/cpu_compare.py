@@ -1,13 +1,17 @@
 # YOLO 检测部署 | bench/cpu_compare.py
 # 在相同视频上轮流运行顺序模式和流水线模式，读取各次 yolo_detector 的报告。
 # 同时核对输出帧数，避免把少处理帧造成的“变快”算作吞吐提升。
+#
+# 阅读地图（按源码顺序）
+#   1 CPU基线比较 → 2 交替顺序测量 → 3 对照顺序
 
 
-# 模块：CPU基线比较：组织固定输入下的顺序与流水线测量
+# 模块 1：CPU基线比较
+# 功能：组织固定输入下的顺序与流水线测量
 
 
 """Alternating sequential/pipeline measurements; no claim of guaranteed speedup."""
-from pathlib import Path
+from pathlib import Path  # 拼接目录、文件名并读取文件
 import hashlib, json, subprocess, time, os
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,11 +29,17 @@ record = {
 }
 
 
-# 模块：交替顺序测量
+# 模块 2：交替顺序测量
 # 轮换两种模式谁先跑，减少固定顺序对缓存、温度等因素的偏向。
 
 
 for repeat in range(3):
+
+
+    # 模块 3：对照顺序
+    # 偶数轮先顺序执行，奇数轮反过来。两种模式轮流先跑，减少缓存与时间顺序带来的偏差。
+
+
     modes = ['sequential', 'pipeline'] if repeat % 2 == 0 else ['pipeline', 'sequential']
     for mode in modes:
         label = f'compare-{repeat}-{mode}'
@@ -63,6 +73,7 @@ for repeat in range(3):
                     raise RuntimeError('comparison timeout')
                 try:
                     for line in Path(f'/proc/{p.pid}/status').read_text().splitlines():
+                        # VmHWM 是该进程历史驻留内存的高水位，单位 KiB；它同时包含模型、运行库和其余进程内数据。
                         if line.startswith('VmHWM:'):
                             peak = max(peak, int(line.split()[1]))
                 except FileNotFoundError:
@@ -70,6 +81,7 @@ for repeat in range(3):
                 time.sleep(0.05)
             assert p.returncode == 0, (label, p.returncode)
         row = json.loads(path.read_text())
+        # 先核对两种模式做了相同的工作量，再比 FPS。漏处理一半帧也可能得到看似很快的耗时。
         assert row['output_frames'] == row['inferred_frames'] == row['read_frames'] == 30
         row.update(repeat=repeat, peak_rss_kib_sampled=peak)
         record['runs'].append(row)

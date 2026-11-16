@@ -2,6 +2,12 @@
 # 离线比较 YOLO 的 FP32 和静态 INT8 模型。前一组视频帧用于校准，后一组用于比较。
 # 同一输入分别跑两个模型，报告文件大小、推理时间和原始张量偏差。
 # 要了解框有没有检对，接着看 validate_coco8.py 的带标注评估。
+#
+# 阅读地图（按源码顺序）
+#   1 CPU量化工具 → 2 文件校验 → 3 图像预处理
+#   4 校准图片 → 5 校准数据接口 → 6 推理会话
+#   7 模型约定检查 → 8 执行入口 → 9 区分帧号与内容
+#   10 生成量化图 → 11 检查 QDQ → 12 成对测量
 
 
 # 这是一个YOLO 目标检测模型（ONNX 格式）的 INT8 量化实验工具。
@@ -44,27 +50,29 @@
 # 计时口径说明：只计 Session.run，不含预处理和排队，避免被误解为端到端延迟。
 
 
-# 模块：CPU量化工具：校准、静态INT8转换及正确性/性能对比
+# 模块 1：CPU量化工具
+# 功能：校准、静态INT8转换及正确性/性能对比
 
 
 """CPU INT8 QDQ experiment using disjoint video frames. No implicit downloads."""
-import argparse
-import hashlib
+import argparse  # 读取命令行输入并检查参数格式
+import hashlib  # 按文件或字节内容计算指纹
 import importlib.metadata
-import json
-import math
-from pathlib import Path
-import time
+import json  # 在 Python 对象和 JSON 文本之间转换
+import math  # 检查有限数值或做数值运算
+from pathlib import Path  # 拼接目录、文件名并读取文件
+import time  # 记录时间、设置等待间隔或截止时刻
 
-import cv2
-import numpy as np
+import cv2  # 用 OpenCV 解码或处理图像
+import numpy as np  # 存放张量并按形状、通道进行数组计算
 import onnx
 import onnxruntime as ort
 from onnxruntime.quantization import CalibrationDataReader, QuantFormat, QuantType, quantize_static
 from onnxruntime.quantization.shape_inference import quant_pre_process
 
 
-# 模块：文件校验：分块计算SHA-256
+# 模块 2：文件校验
+# 功能：分块计算SHA-256
 
 
 def sha256(path):
@@ -75,11 +83,18 @@ def sha256(path):
     return digest.hexdigest()
 
 
-# 模块：图像预处理：生成与C++输入约定一致的校准数据
+# 模块 3：图像预处理
+# 功能：生成与C++输入约定一致的校准数据
 
 
 def prepare(image):
     """Match prepare_yolo: round positive dimensions, center padding, RGB NCHW."""
+
+
+    # 模块 4：校准图片
+    # 校准输入必须和部署时看到的像素含义一致。例如红蓝通道倒了，即使张量形状正确，采样到的激活范围也会变。
+
+
     if image is None or image.dtype != np.uint8 or image.ndim != 3 or image.shape[2] != 3:
         raise ValueError('expected nonempty BGR uint8 image')
     height, width = image.shape[:2]
@@ -103,9 +118,11 @@ def prepare(image):
     return cv2.dnn.blobFromImage(padded, 1 / 255, swapRB=True, crop=False, ddepth=cv2.CV_32F)
 
 
-# 模块：校准数据接口：按批提供已经准备好的输入
+# 模块 5：校准数据接口
+# 功能：按批提供已经准备好的输入
 
 
+# 量化器主动向 Reader 索取下一份输入。字典的键是模型的实际输入名，值是已排成 NCHW 的图片。
 class Reader(CalibrationDataReader):
     def __init__(self, name, tensors):
         self.name = name
@@ -120,7 +137,8 @@ class Reader(CalibrationDataReader):
         self.iterator = iter(self.tensors)
 
 
-# 模块：推理会话：建立CPU执行会话
+# 模块 6：推理会话
+# 功能：建立CPU执行会话
 
 
 def session(path, threads):
@@ -129,9 +147,11 @@ def session(path, threads):
     return ort.InferenceSession(str(path), options, providers=['CPUExecutionProvider'])
 
 
-# 模块：模型约定检查：验证输入输出类型和形状
+# 模块 7：模型约定检查
+# 功能：验证输入输出类型和形状
 
 
+# 读取会话元数据时的 [1,3,640,640] 是形状描述；真正的一张图包含 1×3×640×640 个浮点数。
 def check_contract(engine):
     # 获取模型的全部输入和输出节点信息
     inputs, outputs = engine.get_inputs(), engine.get_outputs()
@@ -149,7 +169,8 @@ def check_contract(engine):
         raise ValueError('expected FP32 output [1,84,8400]')
 
 
-# 模块：执行入口：读取参数并组织该工具的完整流程
+# 模块 8：执行入口
+# 功能：读取参数并组织该工具的完整流程
 
 
 def main():
@@ -169,6 +190,7 @@ def main():
         and 1 <= args.threads <= 6
     ):
         parser.error('frame/repeat/thread limits exceeded')
+    # 每次使用新的输出目录，让上次模型、校准记录和测速结果能够单独找回。
     if args.output.exists():
         parser.error('output already exists; choose a new directory to preserve prior evidence')
     args.output.mkdir(parents=True)
@@ -195,6 +217,7 @@ def main():
                 tensors.append(prepare(image))
         finally:
             capture.release()
+        # 假设读取 16 帧、校准帧数为 8：前 8 帧给量化器，后 8 帧给浮点和量化模型做同输入比较。
         calibration = tensors[: args.calibration_frames]
         evaluation = tensors[args.calibration_frames :]
         report['calibration_frame_ids'] = list(range(args.calibration_frames))
@@ -207,6 +230,12 @@ def main():
         report['evaluation_tensor_sha256'] = [
             hashlib.sha256(t.tobytes()).hexdigest() for t in evaluation
         ]
+
+
+        # 模块 9：区分帧号与内容
+        # 视频中的第 1 帧和第 2 帧可能像素完全相同；用张量哈希才能识别这种重复。
+
+
         calibration_hashes = set(report['calibration_tensor_sha256'])
         evaluation_hashes = set(report['evaluation_tensor_sha256'])
         report['unique_calibration_tensors'] = len(calibration_hashes)
@@ -223,6 +252,12 @@ def main():
         name = original.get_inputs()[0].name
         quantized = args.output / 'model.int8.onnx'
         prepared = args.output / 'model.prepared.onnx'
+
+
+        # 模块 10：生成量化图
+        # 先整理原模型图，再用 Reader 给出的样本统计激活范围。校准只需输入图像，不依赖人工标框。
+
+
         quant_pre_process(str(args.model), str(prepared))
         
         # 静态量化：把 FP32 模型转成 INT8 模型，目的是让模型更小、推理更快。
@@ -252,6 +287,12 @@ def main():
         model = onnx.load(str(quantized))
         # 统计计算图里每种算子出现了多少次，例如 {'Conv': 60, 'QuantizeLinear': 120, ...}
         counts = {}
+
+
+        # 模块 11：检查 QDQ
+        # QuantizeLinear 和 DequantizeLinear 标记数值进出量化表示的边界；节点个数本身不能说明机器执行得更快。
+
+
         for node in model.graph.node:
             counts[node.op_type] = counts.get(node.op_type, 0) + 1
         # 安全检查：QDQ 格式的量化一定会生成这两种节点。
@@ -283,6 +324,12 @@ def main():
         # 预热：每个模型先空跑 2 次，结果不计入统计。
         # 通俗讲：第一次运行时要分配内存、初始化线程、加载缓存，会特别慢，
         # 不预热的话这部分"开机时间"会污染测速结果
+
+
+        # 模块 12：成对测量
+        # 同一帧给两个模型，预热移出统计，交替先后顺序。这样两组计时比较的是同一种输入负载。
+
+
         for engine in engines.values():
             for _ in range(2):
                 engine.run(None, {name: evaluation[0]})
@@ -307,6 +354,7 @@ def main():
                 # 数值差异只在第一轮算一次即可，因为同一输入下每轮结果是一样的，重复算没有意义
                 if repeat == 0:
                     # 转成 float64 再相减，避免用 float32 做减法时自身引入误差
+                    # 先转高精度再相减。坐标误差和类别分数误差的单位不同，因此还单独统计分数部分；检测 AP 要另用带标注图像算。
                     difference = outputs['int8'].astype(np.float64) - outputs['fp32']
                     errors.append(
                         {

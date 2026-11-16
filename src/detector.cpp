@@ -2,19 +2,24 @@
 // 图片模式和视频模式最后都会走到这里。构造 Detector 时读类别表并创建推理后端；
 // 每次 detect 只处理一帧，依次准备浮点输入、执行模型、解码框、在图片副本上绘制。
 // 要看像素怎样变成张量，顺着 prepare_yolo 进入 yolo_processing.cpp。
+//
+// 阅读地图（按源码顺序）
+//   1 计时辅助 → 2 模型初始化 → 3 单帧检测
+//   4 输入准备 → 5 后端执行 → 6 结果处理
 
 
-#include "detector.h"
-#include "ort_backend.h"
+#include "detector.h"  // 单帧检测入口，调用它即可走完预处理、推理和绘图
+#include "ort_backend.h"  // 让 C++ 程序通过 ONNX Runtime 执行一次模型推理
 #ifdef ENABLE_TENSORRT
 #include "trt_backend.h"
 #endif
-#include <chrono>
+#include <chrono>  // 测两个时刻的差，并明确转换秒或毫秒
 #include <fstream>
 #include <stdexcept>
 
 
-// 模块：计时辅助：把两个时间点的差转换成毫秒
+// 模块 1：计时辅助
+// 功能：把两个时间点的差转换成毫秒
 
 
 namespace {
@@ -26,7 +31,8 @@ double ms(Clock::time_point a, Clock::time_point b) {
 }
 
 
-// 模块：模型初始化：读取类别名称并创建选定后端
+// 模块 2：模型初始化
+// 功能：读取类别名称并创建选定后端
 // 构造时读取类别名并创建后端；同一Detector处理后续各帧时复用已加载的模型。
 
 
@@ -39,6 +45,7 @@ Detector::Detector(const std::string& model,
     if (!file)
         throw std::runtime_error("cannot open classes: " + classes);
     std::string name;
+    // 类别文件一行一个名字。Windows 行尾的回车若保留下来，看着相同的名字也可能比较失败。
     while (std::getline(file, name)) {
         if (!name.empty() && name.back() == '\r')
             name.pop_back();
@@ -60,18 +67,21 @@ Detector::Detector(const std::string& model,
 }
 
 
-// 模块：单帧检测：串联预处理、推理、后处理与绘图
+// 模块 3：单帧检测
+// 功能：串联预处理、推理、后处理与绘图
 // 单帧主线：原图副本用于绘制，input浮点数组用于推理，两者用途不同。
 // info贯穿预处理和后处理，output是模型原始数字，返回值才是画好框的BGR图片。
 
 
 cv::Mat Detector::detect(const cv::Mat& image) {
     auto begin = Clock::now();
+    // cv::Mat 直接赋值通常共享像素；这里 clone 是为了把框画到独立图上，保留调用者的原图。
     auto result = image.clone();
     auto cloned = Clock::now();
 
 
-    // 模块：1. 输入准备：保存几何变换并生成模型输入
+    // 模块 4：输入准备
+    // 功能：保存几何变换并生成模型输入
 
 
     LetterboxInfo info;
@@ -79,14 +89,17 @@ cv::Mat Detector::detect(const cv::Mat& image) {
     auto prepared = Clock::now();
 
 
-    // 模块：2. 后端执行：复用已加载模型获取原始输出
+    // 模块 5：后端执行
+    // 功能：复用已加载模型获取原始输出
 
 
+    // backend_ 指向构造时选好的对象。这里每帧只调用 infer，无需再读权重或重新选后端。
     auto output = backend_->infer(input);
     auto inferred = Clock::now();
 
 
-    // 模块：3. 结果处理：解析检测框并画到图片副本上
+    // 模块 6：结果处理
+    // 功能：解析检测框并画到图片副本上
 
 
     detections_ = decode_yolo(output, image.size(), info);
